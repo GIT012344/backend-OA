@@ -6,7 +6,7 @@ import psycopg2
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-LINE_ACCESS_TOKEN = "0wrW85zf5NXhGWrHRjwxitrZ33JPegxtB749lq9TWRlrlCvfl0CKN9ceTw+kzPqBc6yjEOlV3EJOqUsBNhiFGQu3asN1y6CbHIAkJINhHNWi5gY9+O3+SnvrPaZzI7xbsBuBwe8XdIx33wdAN+79bgdB04t89/1O/w1cDnyilFU="
+LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
 
 
 app = Flask(__name__)
@@ -15,7 +15,7 @@ app = Flask(__name__)
 cors = CORS(app, resources={
     r"/*": {
         "origins": [
-            "https://my-frontend-51dy.onrender.com",
+            "https://frontend-oa.onrender.com",
             "http://localhost:3000"
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -27,7 +27,7 @@ cors = CORS(app, resources={
 
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'https://my-frontend-51dy.onrender.com')
+    response.headers.add('Access-Control-Allow-Origin', 'https://frontend-oa.onrender.com')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
@@ -35,10 +35,10 @@ def after_request(response):
     return response
 
 # PostgreSQL config
-DB_NAME = 'flask_pg'
-DB_USER = 'flask_pg_user'
-DB_PASSWORD = 'N5U6ELzotV0Zog1lG1pRDzNYtiMzgCQg'
-DB_HOST = 'dpg-d18dv3ruibrs73bq92ug-a.singapore-postgres.render.com'
+DB_NAME = 'datagit'
+DB_USER = 'git'
+DB_PASSWORD = '4H9c9zbnSxqdrQVUY2ErAtJwzJINcfNn'
+DB_HOST = 'dpg-d19qj8bipnbc739c4aq0-a.singapore-postgres.render.com'
 DB_PORT = 5432
 
 # Google Sheets config
