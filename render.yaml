@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: flask-backend
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: flask_pg
+          property: host
+      - key: DB_NAME
+        fromDatabase:
+          name: flask_pg
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: flask_pg
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: flask_pg
+          property: password
