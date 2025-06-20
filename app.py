@@ -24,6 +24,11 @@ cors = CORS(app, resources={
     }
 })
 
+@app.before_request
+def log_request_info():
+    app.logger.debug('Headers: %s', request.headers)
+    app.logger.debug('Body: %s', request.get_data())
+
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', 'https://frontend-oa.onrender.com')
@@ -49,6 +54,23 @@ CREDENTIALS_FILE = 'credentials.json'  # path ไปยังไฟล์ servic
 def log_request_info():
     app.logger.debug('Headers: %s', request.headers)
     app.logger.debug('Body: %s', request.get_data())
+
+@app.route('/webhook', methods=['POST'])
+def handle_webhook():
+    try:
+        data = request.json
+        app.logger.info(f"Received webhook data: {data}")
+        
+        # ตรวจสอบข้อมูลที่จำเป็น
+        if not data or 'ticket_id' not in data or 'status' not in data:
+            return jsonify({"error": "ticket_id and status required"}), 400
+        
+        return update_status()
+        
+    except Exception as e:
+        app.logger.error(f"Webhook error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 
 def send_textbox_message(user_id, message_text):
     url = "https://api.line.me/v2/bot/message/push"
@@ -753,9 +775,13 @@ def update_status():
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
 
+    if request.content_type != 'application/json':
+        return jsonify({"error": "Content-Type must be application/json"}), 415
+    
+    # ตรวจสอบข้อมูลที่จำเป็น
     if not ticket_id or not new_status:
+        app.logger.error(f"Missing required fields. Data received: {data}")
         return jsonify({"error": "ticket_id and status required"}), 400
-
     try:
         # 1. Update PostgreSQL
         conn = psycopg2.connect(
