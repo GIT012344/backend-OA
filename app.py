@@ -15,8 +15,7 @@ app = Flask(__name__)
 cors = CORS(app, resources={
     r"/*": {
         "origins": [
-            "https://frontend-oa.onrender.com",
-            "http://localhost:3000"
+            "https://frontend-oa.onrender.com"
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
@@ -43,7 +42,7 @@ DB_PORT = 5432
 
 # Google Sheets config
 SHEET_NAME = 'Tickets'  # ชื่อ Google Sheet ที่มีข้อมูล
-WORKSHEET_NAME = 'sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
+WORKSHEET_NAME = 'Sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
 CREDENTIALS_FILE = 'credentials.json'  # path ไปยังไฟล์ service account
 
 @app.before_request
@@ -1772,4 +1771,4 @@ def sync_route():
 if __name__ == '__main__':
     create_tickets_table()
     sync_google_sheet_to_postgres()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=False)
