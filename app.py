@@ -6,16 +6,14 @@ import psycopg2
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
 import logging
 logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-
-# Update your CORS configuration to be more permissive
 CORS(app, resources={
-    r"/*": {
+    r"/.*": {
         "origins": [
             "https://frontend-oa.onrender.com",
             "http://localhost:3000"
@@ -54,21 +52,19 @@ DB_NAME = 'datagit'
 DB_USER = 'git'
 DB_PASSWORD = '4H9c9zbnSxqdrQVUY2ErAtJwzJINcfNn'
 DB_HOST = 'dpg-d19qj8bipnbc739c4aq0-a.singapore-postgres.render.com'
-DB_PORT = 5432
-
-API_KEYS = {
-    "apps-script": "https://script.google.com/macros/s/AKfycbzjF4FD4JuHqnuw1Kd1Et8--u8JNUn3s5SzDUakMmN8F0_Zha6U9JAOeF6Z2BHyDOVhsg/exec"  # ต้องตรงกับ API_KEY ใน Apps Script
-}
-
-# Google Sheets config
-SHEET_NAME = 'Tickets'  # ชื่อ Google Sheet ที่มีข้อมูล
-WORKSHEET_NAME = 'Sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
-CREDENTIALS_FILE = 'credentials.json'  # path ไปยังไฟล์ service account
+DB_PORT = 5432  # path ไปยังไฟล์ service account
 
 # เพิ่ม API Key Verification
 API_KEYS = {
     "apps-script": "https://script.google.com/macros/s/AKfycbzjF4FD4JuHqnuw1Kd1Et8--u8JNUn3s5SzDUakMmN8F0_Zha6U9JAOeF6Z2BHyDOVhsg/exec"
 }
+
+LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
+
+
+SHEET_NAME = 'Tickets'  # ชื่อ Google Sheet ที่มีข้อมูล
+WORKSHEET_NAME = 'Sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
+CREDENTIALS_FILE = 'credentials.json'
 
 @app.before_request
 def check_api_key():
@@ -158,7 +154,7 @@ def notify_user(payload):
         "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
     }
 
-    # แปลง payload เป็น Flex Message แบบเดียวกับใน Apps Script
+    # สร้าง Flex Message
     flex_message = create_flex_message(payload)
 
     body = {
@@ -166,8 +162,14 @@ def notify_user(payload):
         "messages": [flex_message]
     }
 
-    response = requests.post(url, headers=headers, json=body)
-    return response.status_code == 200
+    try:
+        response = requests.post(url, headers=headers, json=body)
+        if response.status_code != 200:
+            logger.error(f"LINE API Error: {response.status_code} - {response.text}")
+        return response.status_code == 200
+    except Exception as e:
+        logger.error(f"Error sending LINE message: {str(e)}")
+        return False
 
 
 
@@ -802,7 +804,13 @@ def update_status():
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response, 200
+        return response
+    if request.content_type != 'application/json':
+        return jsonify({"error": "Content-Type must be application/json"}), 415
+    
+    api_key = request.headers.get('X-API-KEY') or request.args.get('api_key')
+    if api_key and api_key not in API_KEYS.values():
+        return jsonify({"error": "Invalid API key"}), 403
 
     data = request.get_json()
     ticket_id = data.get('ticket_id')
@@ -843,6 +851,20 @@ def update_status():
     # 3. Connect to database
     conn = None
     try:
+        data = request.get_json()
+        logger.debug(f"Received update-status request: {data}")
+        required_fields = ['ticket_id', 'status']
+        missing_fields = [f for f in required_fields if f not in data]
+        if missing_fields:
+            return jsonify({
+                "error": "Missing required fields",
+                "missing": missing_fields
+            }), 400
+        
+        ticket_id = data['ticket_id']
+        new_status = data['status']
+        admin_id = data.get('admin_id')
+        
         conn = psycopg2.connect(
             dbname=DB_NAME,
             user=DB_USER,
@@ -864,9 +886,10 @@ def update_status():
 
         ticket = cur.fetchone()
         if not ticket:
+            conn.close()
             return jsonify({"error": "Ticket not found"}), 404
 
-        current_status, db_user_id, name, email = ticket
+        current_status, user_id, name, email, db_user_id, phone, department = ticket
 
         # 5. Check if status actually changed
         if current_status == new_status:
@@ -913,10 +936,12 @@ def update_status():
             target_user = db_user_id or user_id
             payload = {
                 'ticket_id': ticket_id,
-                'user_id': target_user,
+                'user_id': user_id,
                 'status': new_status,
                 'name': name,
                 'email': email,
+                'phone': phone,
+                'department': department,
                 'timestamp': datetime.now().isoformat()
             }
             line_sent = notify_user(payload)
