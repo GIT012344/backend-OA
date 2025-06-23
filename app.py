@@ -21,6 +21,15 @@ CORS(app, resources={
         "max_age": 86400
     }
 })
+CORS(app, resources={
+    r"/update-status": {
+        "origins": ["https://frontend-oa.onrender.com", "http://localhost:3000"],
+        "methods": ["POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-API-KEY"],
+        "supports_credentials": True,
+        "max_age": 86400
+    }
+})
 
 @app.before_request
 def check_api_key():
@@ -159,9 +168,13 @@ def notify_user(payload):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=body)
-        if response.status_code != 200:
-            logger.error(f"LINE API Error: {response.status_code} - {response.text}")
+        response = requests.post(url, headers=headers, json={
+            "to": payload['user_id'],
+            "messages": [{
+                "type": "text",
+                "text": f"Ticket {payload['ticket_id']} ถูกอัปเดตสถานะเป็น {payload['status']}"
+            }]
+        })
         return response.status_code == 200
     except Exception as e:
         logger.error(f"Error sending LINE message: {str(e)}")
@@ -793,36 +806,31 @@ def sync_tickets():
 
 @app.route('/update-status', methods=['POST', 'OPTIONS'])
 def update_status():
-    app.logger.info(f"Received update-status request: {request.json}")
+    # ตรวจสอบ preflight request สำหรับ CORS
     if request.method == 'OPTIONS':
         response = jsonify({'success': True})
         response.headers.add('Access-Control-Allow-Origin', 'https://frontend-oa.onrender.com')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-API-KEY')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-KEY')
         response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
+
+    # ตรวจสอบ Content-Type
     if request.content_type != 'application/json':
         return jsonify({"error": "Content-Type must be application/json"}), 415
-    
-    api_key = request.headers.get('X-API-KEY') or request.args.get('api_key')
-    if api_key and api_key not in API_KEYS.values():
-        return jsonify({"error": "Invalid API key"}), 403
 
+    # ตรวจสอบ API Key
+    api_key = request.headers.get('X-API-KEY')
+    if not api_key or api_key not in API_KEYS.values():
+        return jsonify({"error": "Invalid or missing API key"}), 403
+
+    # ดึงข้อมูลจาก request
     data = request.get_json()
-    ticket_id = data.get('ticket_id')
-    new_status = data.get('status')
+    logger.debug(f"Received update-status request: {data}")
 
-    if not ticket_id or not new_status:
-        return jsonify({"error": "Missing ticket_id or status"}), 400
-    # 1. Validate request
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 415
-
-    data = request.get_json()
-    
-    # 2. Check required fields
-    required_fields = ['ticket_id', 'new_status']
-    missing_fields = [f for f in required_fields if f not in data]
+    # ตรวจสอบฟิลด์ที่จำเป็น
+    required_fields = ['ticket_id', 'status']
+    missing_fields = [field for field in required_fields if field not in data]
     if missing_fields:
         return jsonify({
             "error": "Missing required fields",
@@ -830,10 +838,10 @@ def update_status():
         }), 400
 
     ticket_id = data['ticket_id']
-    new_status = data['new_status']
-    user_id = data.get('user_id')
+    new_status = data['status']
     admin_id = data.get('admin_id')
 
+    # ตรวจสอบ ticket ทดสอบ
     if ticket_id.startswith('TEST-'):
         return jsonify({
             "success": True,
@@ -843,24 +851,9 @@ def update_status():
             "is_test": True
         }), 200
 
-
-    # 3. Connect to database
+    # เชื่อมต่อฐานข้อมูล
     conn = None
     try:
-        data = request.get_json()
-        logger.debug(f"Received update-status request: {data}")
-        required_fields = ['ticket_id', 'status']
-        missing_fields = [f for f in required_fields if f not in data]
-        if missing_fields:
-            return jsonify({
-                "error": "Missing required fields",
-                "missing": missing_fields
-            }), 400
-        
-        ticket_id = data['ticket_id']
-        new_status = data['status']
-        admin_id = data.get('admin_id')
-        
         conn = psycopg2.connect(
             dbname=DB_NAME,
             user=DB_USER,
@@ -869,25 +862,22 @@ def update_status():
             port=DB_PORT
         )
         cur = conn.cursor()
-        cur.execute("SELECT 1 FROM tickets WHERE ticket_id = %s", (ticket_id,))
-        if not cur.fetchone():
-            return jsonify({"error": "Ticket not found"}), 400
-                 # 4. Get current ticket data
+
+        # ดึงข้อมูล ticket ปัจจุบัน
         cur.execute("""
-            SELECT status, user_id, name, email 
+            SELECT status, user_id, name, email, phone, department 
             FROM tickets 
             WHERE ticket_id = %s
             FOR UPDATE
         """, (ticket_id,))
-
+        
         ticket = cur.fetchone()
         if not ticket:
-            conn.close()
             return jsonify({"error": "Ticket not found"}), 404
 
-        current_status, user_id, name, email, db_user_id, phone, department = ticket
+        current_status, user_id, name, email, phone, department = ticket
 
-        # 5. Check if status actually changed
+        # ตรวจสอบว่าสถานะเปลี่ยนไปหรือไม่
         if current_status == new_status:
             return jsonify({
                 "message": "Status unchanged",
@@ -895,18 +885,18 @@ def update_status():
                 "status": new_status
             }), 200
 
-        # 6. Update status in PostgreSQL
+        # อัปเดตสถานะในฐานข้อมูล
         cur.execute("""
             UPDATE tickets 
             SET status = %s 
             WHERE ticket_id = %s
             RETURNING *
         """, (new_status, ticket_id))
-
+        
         updated_ticket = cur.fetchone()
         conn.commit()
 
-        # 7. Log status change
+        # บันทึกประวัติการเปลี่ยนแปลง
         change_message = f"Status changed from {current_status} to {new_status}"
         if admin_id:
             change_message += f" by admin {admin_id}"
@@ -926,10 +916,9 @@ def update_status():
         ))
         conn.commit()
 
-        # 8. Send LINE notification if user exists
+        # ส่งการแจ้งเตือน LINE ถ้ามี user_id
         line_sent = False
-        if db_user_id or user_id:
-            target_user = db_user_id or user_id
+        if user_id:
             payload = {
                 'ticket_id': ticket_id,
                 'user_id': user_id,
@@ -942,7 +931,7 @@ def update_status():
             }
             line_sent = notify_user(payload)
 
-        # 9. Update Google Sheets if configured
+        # อัปเดต Google Sheets ถ้ามีการตั้งค่า
         sheet_updated = False
         if os.path.exists(CREDENTIALS_FILE):
             try:
@@ -960,11 +949,10 @@ def update_status():
                         sheet.update_cell(cell.row, status_col, new_status)
                         sheet_updated = True
             except Exception as e:
-                app.logger.error(f"Google Sheets update error: {str(e)}")
-        
+                logger.error(f"Google Sheets update error: {str(e)}")
 
-        # 10.turn success response
-        response = {
+        # ส่ง response กลับ
+        return jsonify({
             "success": True,
             "ticket_id": ticket_id,
             "new_status": new_status,
@@ -972,22 +960,19 @@ def update_status():
             "line_notification_sent": line_sent,
             "google_sheet_updated": sheet_updated,
             "timestamp": datetime.now().isoformat()
-        }
-
-        return jsonify(response), 200
-        
+        }), 200
 
     except psycopg2.Error as db_error:
         if conn:
             conn.rollback()
-        app.logger.error(f"Database error: {str(db_error)}")
+        logger.error(f"Database error: {str(db_error)}")
         return jsonify({
             "error": "Database operation failed",
             "details": str(db_error)
         }), 500
 
     except Exception as e:
-        app.logger.error(f"Unexpected error: {str(e)}")
+        logger.error(f"Unexpected error: {str(e)}")
         return jsonify({
             "error": "Internal server error",
             "details": str(e)
