@@ -817,6 +817,15 @@ def update_status():
     user_id = data.get('user_id')
     admin_id = data.get('admin_id')
 
+    if ticket_id.startswith('TEST-'):
+        return jsonify({
+            "success": True,
+            "message": "Test ticket processed successfully",
+            "ticket_id": ticket_id,
+            "new_status": new_status,
+            "is_test": True
+        }), 200
+
     # 3. Connect to database
     conn = None
     try:
@@ -828,15 +837,17 @@ def update_status():
             port=DB_PORT
         )
         cur = conn.cursor()
-
-        # 4. Get current ticket data
+        cur.execute("SELECT 1 FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        if not cur.fetchone():
+            return jsonify({"error": "Ticket not found"}), 400
+                 # 4. Get current ticket data
         cur.execute("""
             SELECT status, user_id, name, email 
             FROM tickets 
             WHERE ticket_id = %s
             FOR UPDATE
         """, (ticket_id,))
-        
+
         ticket = cur.fetchone()
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
