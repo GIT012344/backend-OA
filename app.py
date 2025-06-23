@@ -56,15 +56,15 @@ DB_PASSWORD = '4H9c9zbnSxqdrQVUY2ErAtJwzJINcfNn'
 DB_HOST = 'dpg-d19qj8bipnbc739c4aq0-a.singapore-postgres.render.com'
 DB_PORT = 5432
 
+API_KEYS = {
+    "apps-script": "https://script.google.com/macros/s/AKfycbzjF4FD4JuHqnuw1Kd1Et8--u8JNUn3s5SzDUakMmN8F0_Zha6U9JAOeF6Z2BHyDOVhsg/exec"  # ต้องตรงกับ API_KEY ใน Apps Script
+}
+
 # Google Sheets config
 SHEET_NAME = 'Tickets'  # ชื่อ Google Sheet ที่มีข้อมูล
 WORKSHEET_NAME = 'Sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
 CREDENTIALS_FILE = 'credentials.json'  # path ไปยังไฟล์ service account
 
-@app.before_request
-def log_request_info():
-    app.logger.debug('Headers: %s', request.headers)
-    app.logger.debug('Body: %s', request.get_data())
 # เพิ่ม API Key Verification
 API_KEYS = {
     "apps-script": "https://script.google.com/macros/s/AKfycbzjF4FD4JuHqnuw1Kd1Et8--u8JNUn3s5SzDUakMmN8F0_Zha6U9JAOeF6Z2BHyDOVhsg/exec"
@@ -77,7 +77,7 @@ def check_api_key():
         if api_key not in API_KEYS.values():
             return jsonify({"error": "Invalid API key"}), 403
 
-# เพิ่ม endpoint นี้ใน Flask backend
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.json
@@ -799,7 +799,7 @@ def update_status():
             }), 400
 
         ticket_id = data['ticket_id']
-        new_status = data['status']
+        new_status = data['new_status']
         user_id = data.get('user_id')
         admin_id = data.get('admin_id')
 
