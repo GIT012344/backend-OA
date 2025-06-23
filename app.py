@@ -1595,19 +1595,12 @@ def update_ticket():
 def get_messages():
     ticket_id = request.args.get('ticket_id')
     
-    if ticket_id == "announcement":
-        return jsonify([])
-        
     if not ticket_id:
         return jsonify({"error": "Ticket ID is required"}), 400
 
     try:
         conn = psycopg2.connect(
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            host=DB_HOST,
-            port=DB_PORT
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
         )
         cur = conn.cursor()
         
