@@ -88,8 +88,23 @@ def webhook():
     required_fields = ['ticket_id', 'status', 'user_id']
     if not all(field in data for field in required_fields):
         return jsonify({"error": "Missing required fields"}), 400
+
+    missing_fields = [field for field in required_fields if field not in data]
+    if missing_fields:
+        return jsonify({
+            "error": "Missing required fields",
+            "missing": missing_fields
+        }), 400
+    
+    
     
     try:
+        if data.get('ticket_id', '').startswith('TEST-'):
+            return jsonify({
+                "success": True,
+                "message": "Test connection successful",
+                "test_data": data
+            }), 200
         # อัปเดตสถานะใน PostgreSQL
         conn = psycopg2.connect(
             dbname=DB_NAME, user=DB_USER, 
@@ -126,6 +141,7 @@ def webhook():
                     'department': department
                 }
                 notify_user(payload)
+                
         
         return jsonify({"success": True}), 200
         
