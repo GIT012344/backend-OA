@@ -19,12 +19,28 @@ CORS(app, resources={
             "http://localhost:3000"
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
+        "allow_headers": ["Content-Type", "Authorization", "X-API-KEY"],
         "supports_credentials": True,
         "max_age": 86400
     }
 })
 
+@app.before_request
+def check_api_key():
+    if request.endpoint in ['webhook', 'update_status']:
+        api_key = request.headers.get('X-API-KEY') or request.args.get('api_key')
+        if api_key not in API_KEYS.values():
+            return jsonify({"error": "Invalid API key"}), 403
+
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "success"})
+        response.headers.add("Access-Control-Allow-Origin", "https://frontend-oa.onrender.com")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization,X-API-KEY")
+        response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response
 # Add this after_request handler
 @app.after_request
 def after_request(response):
@@ -35,19 +51,6 @@ def after_request(response):
     response.headers.add('Access-Control-Max-Age', '86400')
     return response
 
-# ใน Flask
-CORS(app, resources={
-    r"/*": {
-        "origins": [
-            "https://script.google.com",
-            "https://*.googleusercontent.com"
-        ],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
-    }
-})
-
-# PostgreSQL config
 DB_NAME = 'datagit'
 DB_USER = 'git'
 DB_PASSWORD = '4H9c9zbnSxqdrQVUY2ErAtJwzJINcfNn'
@@ -66,12 +69,7 @@ SHEET_NAME = 'Tickets'  # ชื่อ Google Sheet ที่มีข้อม�
 WORKSHEET_NAME = 'Sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
 CREDENTIALS_FILE = 'credentials.json'
 
-@app.before_request
-def check_api_key():
-    if request.endpoint in ['webhook', 'update_status']:
-        api_key = request.headers.get('X-API-KEY') or request.args.get('api_key')
-        if api_key not in API_KEYS.values():
-            return jsonify({"error": "Invalid API key"}), 403
+
 
 
 @app.route('/webhook', methods=['POST'])
@@ -801,7 +799,7 @@ def update_status():
     if request.method == 'OPTIONS':
         response = jsonify({'success': True})
         response.headers.add('Access-Control-Allow-Origin', 'https://frontend-oa.onrender.com')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-API-KEY')
         response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
