@@ -779,15 +779,8 @@ def sync_tickets():
 
 @app.route('/update-status', methods=['POST'])
 def update_status():
-    """
-    Endpoint สำหรับอัปเดตสถานะ Ticket
-    รับ payload: {
-        "ticket_id": "TICKET-123",
-        "new_status": "In Progress",
-        "user_id": "U123456789" (optional),
-        "admin_id": "A987654321" (optional)
-    }
-    """
+    app.logger.info(f"Received data: {request.json}")
+
     # 1. ตรวจสอบข้อมูลเบื้องต้น
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 415
@@ -806,7 +799,7 @@ def update_status():
             }), 400
 
         ticket_id = data['ticket_id']
-        new_status = data['new_status']
+        new_status = data['status']
         user_id = data.get('user_id')
         admin_id = data.get('admin_id')
 
