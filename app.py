@@ -6,151 +6,101 @@ import psycopg2
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
+
 
 app = Flask(__name__)
 
+
 CORS(app, resources={
     r"/*": {
-        "origins": ["https://frontend-oa.onrender.com", "http://localhost:3000"],
+        "origins": [
+            "https://frontend-oa.onrender.com",
+            "http://localhost:3000"  # สำหรับ development
+        ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-API-KEY"],
+        "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,
-        "max_age": 86400
-    }
-})
-CORS(app, resources={
-    r"/update-status": {
-        "origins": ["https://frontend-oa.onrender.com", "http://localhost:3000"],
-        "methods": ["POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-API-KEY"],
-        "supports_credentials": True,
-        "max_age": 86400
+        "expose_headers": ["Content-Type"]
     }
 })
 
-@app.before_request
-def check_api_key():
-    if request.endpoint in ['webhook', 'update_status']:
-        api_key = request.headers.get('X-API-KEY') or request.args.get('api_key')
-        if api_key not in API_KEYS.values():
-            return jsonify({"error": "Invalid API key"}), 403
-
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        response = jsonify({"status": "success"})
-        response.headers.add("Access-Control-Allow-Origin", "https://frontend-oa.onrender.com")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization,X-API-KEY")
-        response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-        return response
-# Add this after_request handler
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', 'https://frontend-oa.onrender.com')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
-    response.headers.add('Access-Control-Max-Age', '86400')
+    response.headers.add('Access-Control-Expose-Headers', 'Content-Type')
     return response
 
+# PostgreSQL config
 DB_NAME = 'datagit'
 DB_USER = 'git'
 DB_PASSWORD = '4H9c9zbnSxqdrQVUY2ErAtJwzJINcfNn'
 DB_HOST = 'dpg-d19qj8bipnbc739c4aq0-a.singapore-postgres.render.com'
-DB_PORT = 5432  # path ไปยังไฟล์ service account
+DB_PORT = 5432
 
-# เพิ่ม API Key Verification
-API_KEYS = {
-    "frontend": "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU=",
-    "apps-script": "https://script.google.com/macros/s/AKfycbzjF4FD4JuHqnuw1Kd1Et8--u8JNUn3s5SzDUakMmN8F0_Zha6U9JAOeF6Z2BHyDOVhsg/exec"
-}
-
-LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
-
-
+# Google Sheets config
 SHEET_NAME = 'Tickets'  # ชื่อ Google Sheet ที่มีข้อมูล
 WORKSHEET_NAME = 'Sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
-CREDENTIALS_FILE = 'credentials.json'
+CREDENTIALS_FILE = 'credentials.json'  # path ไปยังไฟล์ service account
 
+@app.before_request
+def log_request_info():
+    app.logger.debug('Headers: %s', request.headers)
+    app.logger.debug('Body: %s', request.get_data())
 
+def send_textbox_message(user_id, message_text):
+    url = "https://api.line.me/v2/bot/message/push"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
+    }
 
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    data = request.json
-    if not data:
-        return jsonify({"error": "Invalid data"}), 400
-    
-    # ข้อมูลที่จำเป็นจาก Apps Script
-    required_fields = ['ticket_id', 'status', 'user_id']
-    if not all(field in data for field in required_fields):
-        return jsonify({"error": "Missing required fields"}), 400
-
-    missing_fields = [field for field in required_fields if field not in data]
-    if missing_fields:
-        return jsonify({
-            "error": "Missing required fields",
-            "missing": missing_fields
-        }), 400
-    
-    
-    
-    try:
-        if data.get('ticket_id', '').startswith('TEST-'):
-            return jsonify({
-                "success": True,
-                "message": "Test connection successful",
-                "test_data": data
-            }), 200
-        # อัปเดตสถานะใน PostgreSQL
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, 
-            password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-        )
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE tickets 
-            SET status = %s 
-            WHERE ticket_id = %s
-            RETURNING user_id, name, email, phone, department
-        """, (data['status'], data['ticket_id']))
-        
-        updated_data = cur.fetchone()
-        conn.commit()
-        
-        if updated_data:
-            user_id, name, email, phone, department = updated_data
-            # สร้าง notification
-            message = f"Ticket {data['ticket_id']} updated to {data['status']}"
-            cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
-            conn.commit()
-            
-            # ส่ง LINE Notify (ถ้ามี user_id)
-            if user_id:
-                payload = {
-                    'ticket_id': data['ticket_id'],
-                    'user_id': user_id,
-                    'status': data['status'],
-                    'name': name,
-                    'email': email,
-                    'phone': phone,
-                    'department': department
+    # สร้าง Flex Message สำหรับ textbox reply
+    payload = {
+        "to": user_id,
+        "messages": [
+            {
+                "type": "flex",
+                "altText": "ข้อความจากเจ้าหน้าที่",
+                "contents": {
+                    "type": "bubble",
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "💼 ตอบกลับจากเจ้าหน้าที่",
+                                "weight": "bold",
+                                "size": "lg",
+                                "color": "#005BBB"
+                            },
+                            {
+                                "type": "text",
+                                "text": message_text,
+                                "wrap": True,
+                                "margin": "md"
+                            },
+                            {
+                                "type": "text",
+                                "text": "พิมพ์ 'จบ' เพื่อสิ้นสุดการสนทนา",
+                                "size": "sm",
+                                "color": "#AAAAAA",
+                                "margin": "md"
+                            }
+                        ]
+                    }
                 }
-                notify_user(payload)
-                
-        
-        return jsonify({"success": True}), 200
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        if 'conn' in locals():
-            conn.close()
+            }
+        ]
+    }
+
+    # ส่งข้อความไปยัง LINE Messaging API
+    response = requests.post(url, headers=headers, json=payload)
+    return response.status_code == 200
 
 def notify_user(payload):
     url = "https://api.line.me/v2/bot/message/push"
@@ -159,7 +109,7 @@ def notify_user(payload):
         "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
     }
 
-    # สร้าง Flex Message
+    # แปลง payload เป็น Flex Message แบบเดียวกับใน Apps Script
     flex_message = create_flex_message(payload)
 
     body = {
@@ -167,18 +117,8 @@ def notify_user(payload):
         "messages": [flex_message]
     }
 
-    try:
-        response = requests.post(url, headers=headers, json={
-            "to": payload['user_id'],
-            "messages": [{
-                "type": "text",
-                "text": f"Ticket {payload['ticket_id']} ถูกอัปเดตสถานะเป็น {payload['status']}"
-            }]
-        })
-        return response.status_code == 200
-    except Exception as e:
-        logger.error(f"Error sending LINE message: {str(e)}")
-        return False
+    response = requests.post(url, headers=headers, json=body)
+    return response.status_code == 200
 
 
 
@@ -635,8 +575,6 @@ def get_notifications():
 @app.route('/mark-notification-read', methods=['POST'])
 def mark_notification_read():
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     notification_id = data.get('id')
     
     if not notification_id:
@@ -716,6 +654,12 @@ def create_tickets_table():
     conn.close()
 
 
+def parse_datetime(date_str):
+    try:
+        return datetime.fromisoformat(date_str)
+    except Exception:
+        return None
+  
 @app.route('/api/data', methods=['GET'])
 def get_data():
     try:
@@ -804,190 +748,98 @@ def sync_tickets():
         print(f"Error in sync_tickets: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/update-status', methods=['POST', 'OPTIONS'])
+@app.route('/update-status', methods=['POST'])
 def update_status():
-    # ตรวจสอบ preflight request สำหรับ CORS
-    if request.method == 'OPTIONS':
-        response = jsonify({'success': True})
-        response.headers.add('Access-Control-Allow-Origin', 'https://frontend-oa.onrender.com')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-KEY')
-        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
+    data = request.json
+    ticket_id = data.get("ticket_id")
+    new_status = data.get("status")
 
-    # ตรวจสอบ Content-Type
-    if request.content_type != 'application/json':
-        return jsonify({"error": "Content-Type must be application/json"}), 415
+    if not ticket_id or not new_status:
+        return jsonify({"error": "ticket_id and status required"}), 400
 
-    # ตรวจสอบ API Key
-    api_key = request.headers.get('X-API-KEY')
-    if not api_key or api_key not in API_KEYS.values():
-        return jsonify({"error": "Invalid or missing API key"}), 403
-
-    # ดึงข้อมูลจาก request
-    data = request.get_json()
-    logger.debug(f"Received update-status request: {data}")
-
-    # ตรวจสอบฟิลด์ที่จำเป็น
-    required_fields = ['ticket_id', 'status']
-    missing_fields = [field for field in required_fields if field not in data]
-    if missing_fields:
-        return jsonify({
-            "error": "Missing required fields",
-            "missing": missing_fields
-        }), 400
-
-    ticket_id = data['ticket_id']
-    new_status = data['status']
-    admin_id = data.get('admin_id')
-
-    # ตรวจสอบ ticket ทดสอบ
-    if ticket_id.startswith('TEST-'):
-        return jsonify({
-            "success": True,
-            "message": "Test ticket processed successfully",
-            "ticket_id": ticket_id,
-            "new_status": new_status,
-            "is_test": True
-        }), 200
-
-    # เชื่อมต่อฐานข้อมูล
-    conn = None
     try:
+        # 1. Update PostgreSQL
         conn = psycopg2.connect(
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            host=DB_HOST,
-            port=DB_PORT
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
         )
         cur = conn.cursor()
 
-        # ดึงข้อมูล ticket ปัจจุบัน
-        cur.execute("""
-            SELECT status, user_id, name, email, phone, department 
-            FROM tickets 
-            WHERE ticket_id = %s
-            FOR UPDATE
-        """, (ticket_id,))
+        # Get current status
+        cur.execute("SELECT status FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        result = cur.fetchone()
         
-        ticket = cur.fetchone()
-        if not ticket:
+        if not result:
+            conn.close()
             return jsonify({"error": "Ticket not found"}), 404
+            
+        current_status = result[0]
 
-        current_status, user_id, name, email, phone, department = ticket
+        # Only proceed if status is actually changing
+        if current_status != new_status:
+            # Update status
+            cur.execute("UPDATE tickets SET status = %s WHERE ticket_id = %s", (new_status, ticket_id))
+            
+            # Get ticket details for notification
+            cur.execute("SELECT name, email FROM tickets WHERE ticket_id = %s", (ticket_id,))
+            ticket = cur.fetchone()
+            
+            if ticket:
+                name, email = ticket
+                message = f"Ticket #{ticket_id} ({name}) changed from {current_status} to {new_status}"
+                cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
+            
+            conn.commit()
+            
+            # 2. Update Google Sheets
+            scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+            creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
+            client = gspread.authorize(creds)
+            sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
-        # ตรวจสอบว่าสถานะเปลี่ยนไปหรือไม่
-        if current_status == new_status:
-            return jsonify({
-                "message": "Status unchanged",
-                "ticket_id": ticket_id,
-                "status": new_status
-            }), 200
+            cell = sheet.find(ticket_id)
+            if cell:
+                headers = sheet.row_values(1)
+                if "สถานะ" in headers:
+                    status_col = headers.index("สถานะ") + 1
+                    sheet.update_cell(cell.row, status_col, new_status)
+                    
+                    # Prepare payload for LINE notification
+                    row_data = sheet.row_values(cell.row)
+                    ticket_data = dict(zip(headers, row_data))
+                    
+                    payload = {
+                        'ticket_id': ticket_data.get('Ticket ID'),
+                        'user_id': ticket_data.get('User ID'),
+                        'status': new_status,
+                        'email': ticket_data.get('อีเมล'),
+                        'name': ticket_data.get('ชื่อ'),
+                        'phone': ticket_data.get('เบอร์ติดต่อ'),
+                        'department': ticket_data.get('แผนก'),
+                        'created_at': ticket_data.get('วันที่แจ้ง'),
+                        'appointment': ticket_data.get('Appointment'),
+                        'requested': ticket_data.get('Requeste'),
+                        'report': ticket_data.get('Report'),
+                        'type': ticket_data.get('Type'),
+                        'textbox': ticket_data.get('TEXTBOX'),
+                    }
 
-        # อัปเดตสถานะในฐานข้อมูล
-        cur.execute("""
-            UPDATE tickets 
-            SET status = %s 
-            WHERE ticket_id = %s
-            RETURNING *
-        """, (new_status, ticket_id))
-        
-        updated_ticket = cur.fetchone()
-        conn.commit()
-
-        # บันทึกประวัติการเปลี่ยนแปลง
-        change_message = f"Status changed from {current_status} to {new_status}"
-        if admin_id:
-            change_message += f" by admin {admin_id}"
-        
-        cur.execute("""
-            INSERT INTO ticket_history (
-                ticket_id, changed_by, change_type, 
-                old_value, new_value, description
-            ) VALUES (%s, %s, %s, %s, %s, %s)
-        """, (
-            ticket_id, 
-            admin_id or 'system', 
-            'status', 
-            current_status, 
-            new_status, 
-            change_message
-        ))
-        conn.commit()
-
-        # ส่งการแจ้งเตือน LINE ถ้ามี user_id
-        line_sent = False
-        if user_id:
-            payload = {
-                'ticket_id': ticket_id,
-                'user_id': user_id,
-                'status': new_status,
-                'name': name,
-                'email': email,
-                'phone': phone,
-                'department': department,
-                'timestamp': datetime.now().isoformat()
-            }
-            line_sent = notify_user(payload)
-
-        # อัปเดต Google Sheets ถ้ามีการตั้งค่า
-        sheet_updated = False
-        if os.path.exists(CREDENTIALS_FILE):
-            try:
-                scope = ['https://spreadsheets.google.com/feeds', 
-                        'https://www.googleapis.com/auth/drive']
-                creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-                client = gspread.authorize(creds)
-                sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
-                cell = sheet.find(ticket_id)
-                if cell:
-                    headers = sheet.row_values(1)
-                    if "สถานะ" in headers:
-                        status_col = headers.index("สถานะ") + 1
-                        sheet.update_cell(cell.row, status_col, new_status)
-                        sheet_updated = True
-            except Exception as e:
-                logger.error(f"Google Sheets update error: {str(e)}")
-
-        # ส่ง response กลับ
-        return jsonify({
-            "success": True,
-            "ticket_id": ticket_id,
-            "new_status": new_status,
-            "previous_status": current_status,
-            "line_notification_sent": line_sent,
-            "google_sheet_updated": sheet_updated,
-            "timestamp": datetime.now().isoformat()
-        }), 200
-
-    except psycopg2.Error as db_error:
-        if conn:
-            conn.rollback()
-        logger.error(f"Database error: {str(db_error)}")
-        return jsonify({
-            "error": "Database operation failed",
-            "details": str(db_error)
-        }), 500
-
+                    notify_user(payload)
+                    
+                return jsonify({"message": "✅ Updated both PostgreSQL and Google Sheets"})
+            return jsonify({"error": "Ticket ID not found in sheet"}), 404
+        else:
+            return jsonify({"message": "Status unchanged"})
+            
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        return jsonify({
-            "error": "Internal server error",
-            "details": str(e)
-        }), 500
-
+        return jsonify({"error": str(e)}), 500
     finally:
-        if conn:
+        if 'conn' in locals():
             conn.close()
 
 
 @app.route('/delete-ticket', methods=['POST'])
 def delete_ticket():
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
 
     if not ticket_id:
@@ -1041,9 +893,7 @@ def delete_ticket():
                 return jsonify({"success": True, "message": "Ticket deleted from both PostgreSQL and Google Sheets"})
             else:
                 return jsonify({"error": "Ticket not found in Google Sheets"}), 404
-        except Exception as e:
-            if "not found" in str(e).lower():
-                return jsonify({"error": "Ticket not found in Google Sheets"}), 404
+        except gspread.exceptions.CellNotFound:
             return jsonify({"error": "Ticket not found in Google Sheets"}), 404
 
     except Exception as e:
@@ -1052,8 +902,6 @@ def delete_ticket():
 @app.route('/api/messages/delete', methods=['POST'])
 def delete_messages():
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
 
     if not ticket_id:
@@ -1083,8 +931,6 @@ def delete_messages():
 @app.route('/auto-clear-textbox', methods=['POST'])
 def auto_clear_textbox():
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
 
     if not ticket_id:
@@ -1205,8 +1051,6 @@ def clear_textboxes():
 @app.route('/refresh-messages', methods=['POST'])
 def refresh_messages():
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
 
@@ -1270,8 +1114,6 @@ def update_textbox():
         return jsonify({"error": "Content-Type must be application/json"}), 415
 
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get("ticket_id")
     new_text = data.get("textbox")
     is_announcement = data.get("is_announcement", False)
@@ -1321,9 +1163,9 @@ def update_textbox():
         sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
         cell = sheet.find(ticket_id)
-        headers = sheet.row_values(1)
         if cell:
-            if new_text is not None and "TEXTBOX" in headers:
+            headers = sheet.row_values(1)
+            if "TEXTBOX" in headers:
                 textbox_col = headers.index("TEXTBOX") + 1
                 sheet.update_cell(cell.row, textbox_col, new_text)
             return jsonify({"message": "✅ Updated textbox in PostgreSQL and Google Sheets"})
@@ -1368,8 +1210,6 @@ def get_email_rankings():
 @app.route('/send-announcement', methods=['POST'])
 def send_announcement():
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     announcement_message = data.get('message')
 
     if not announcement_message:
@@ -1425,9 +1265,8 @@ def send_announcement():
                     cell = sheet.find(ticket_id)
                     if cell:
                         sheet.update_cell(cell.row, textbox_col, full_message)
-                except Exception as e:
-                    if "not found" in str(e).lower():
-                        continue
+                except gspread.exceptions.CellNotFound:
+                    continue
 
         # 4. สร้าง notification ในระบบ
         cur.execute(
@@ -1627,8 +1466,6 @@ def send_textbox_message(user_id, message_text):
 @app.route('/delete-notification', methods=['POST'])
 def delete_notification():
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     notification_id = data.get('id')
     
     if not notification_id:
@@ -1715,8 +1552,6 @@ def update_ticket():
         return jsonify({"error": "Content-Type must be application/json"}), 415
 
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
     new_textbox = data.get("textbox")
@@ -1745,17 +1580,14 @@ def update_ticket():
     try:
         cell = sheet.find(ticket_id)
         headers = sheet.row_values(1)
-        if cell:
-            if new_status is not None and "สถานะ" in headers:
-                status_col = headers.index("สถานะ") + 1
-                sheet.update_cell(cell.row, status_col, new_status)
-            if new_textbox is not None and "TEXTBOX" in headers:
-                textbox_col = headers.index("TEXTBOX") + 1
-                sheet.update_cell(cell.row, textbox_col, new_textbox)
-    except Exception as e:
-        if "not found" in str(e).lower():
-            return jsonify({"error": "Ticket not found in Google Sheets"}), 404
-        return jsonify({"error": "Ticket not found in Google Sheets"}), 404
+        if new_status is not None and "สถานะ" in headers:
+            status_col = headers.index("สถานะ") + 1
+            sheet.update_cell(cell.row, status_col, new_status)
+        if new_textbox is not None and "TEXTBOX" in headers:
+            textbox_col = headers.index("TEXTBOX") + 1
+            sheet.update_cell(cell.row, textbox_col, new_textbox)
+    except gspread.exceptions.CellNotFound:
+        return jsonify({"error": "Ticket ID not found in sheet"}), 404
 
     return jsonify({"message": "✅ Ticket updated in PostgreSQL and Google Sheets"})
 
@@ -1811,8 +1643,6 @@ def get_messages():
 @app.route('/api/messages', methods=['POST'])
 def add_message():
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
     sender_name = data.get('sender_name')
@@ -1855,21 +1685,17 @@ def add_message():
         try:
             cell = sheet.find(ticket_id)
             headers = sheet.row_values(1)
-            if cell and "TEXTBOX" in headers:
+            if "TEXTBOX" in headers:
                 textbox_col = headers.index("TEXTBOX") + 1
                 sheet.update_cell(cell.row, textbox_col, '')
-        except Exception as e:
-            if "not found" in str(e).lower():
-                pass  # ไม่ต้องทำอะไรถ้าไม่พบ ticket ใน sheet
+        except gspread.exceptions.CellNotFound:
+            pass  # ไม่ต้องทำอะไรถ้าไม่พบ ticket ใน sheet
         
-        if new_message:
-            return jsonify({
-                "id": new_message[0],
-                "timestamp": new_message[1].isoformat(),
-                "success": True
-            })
-        else:
-            return jsonify({"error": "Failed to create message"}), 500
+        return jsonify({
+            "id": new_message[0],
+            "timestamp": new_message[1].isoformat(),
+            "success": True
+        })
         
     except Exception as e:
         conn.rollback()
@@ -1881,8 +1707,6 @@ def add_message():
 @app.route('/api/messages/mark-read', methods=['POST'])
 def mark_messages_read():
     data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
 
