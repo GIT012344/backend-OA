@@ -4,7 +4,6 @@ gunicorn
 requests
 psycopg2-binary
 gspread
-oauth2client
 google-auth
 google-auth-oauthlib
 python-dotenv

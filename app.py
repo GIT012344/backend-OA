@@ -4,7 +4,7 @@ import requests
 from flask_cors import CORS 
 import psycopg2
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 from datetime import datetime
 LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
 
@@ -12,10 +12,11 @@ LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg
 app = Flask(__name__)
 
 
-cors = CORS(app, resources={
+CORS(app, resources={
     r"/*": {
         "origins": [
-            "https://frontend-oa.onrender.com"
+            "https://frontend-oa.onrender.com",
+            "http://localhost:3000"  # สำหรับ development
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
@@ -411,7 +412,7 @@ def sync_google_sheet_to_postgres():
             print("❌ credentials.json not found, skipping Google Sheets sync")
             return []
             
-        creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
         client = gspread.authorize(creds)
         
         # เปิด Sheet และ Worksheet
@@ -574,6 +575,8 @@ def get_notifications():
 @app.route('/mark-notification-read', methods=['POST'])
 def mark_notification_read():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     notification_id = data.get('id')
     
     if not notification_id:
@@ -653,12 +656,6 @@ def create_tickets_table():
     conn.close()
 
 
-def parse_datetime(date_str):
-    try:
-        return datetime.fromisoformat(date_str)
-    except Exception:
-        return None
-  
 @app.route('/api/data', methods=['GET'])
 def get_data():
     try:
@@ -750,6 +747,8 @@ def sync_tickets():
 @app.route('/update-status', methods=['POST'])
 def update_status():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
 
@@ -791,7 +790,7 @@ def update_status():
             
             # 2. Update Google Sheets
             scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-            creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+            creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
             client = gspread.authorize(creds)
             sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
@@ -839,6 +838,8 @@ def update_status():
 @app.route('/delete-ticket', methods=['POST'])
 def delete_ticket():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
 
     if not ticket_id:
@@ -865,7 +866,7 @@ def delete_ticket():
 
         # 2. ลบจาก Google Sheets
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
         client = gspread.authorize(creds)
         sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
@@ -892,7 +893,9 @@ def delete_ticket():
                 return jsonify({"success": True, "message": "Ticket deleted from both PostgreSQL and Google Sheets"})
             else:
                 return jsonify({"error": "Ticket not found in Google Sheets"}), 404
-        except gspread.exceptions.CellNotFound:
+        except Exception as e:
+            if "not found" in str(e).lower():
+                return jsonify({"error": "Ticket not found in Google Sheets"}), 404
             return jsonify({"error": "Ticket not found in Google Sheets"}), 404
 
     except Exception as e:
@@ -901,6 +904,8 @@ def delete_ticket():
 @app.route('/api/messages/delete', methods=['POST'])
 def delete_messages():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
 
     if not ticket_id:
@@ -930,6 +935,8 @@ def delete_messages():
 @app.route('/auto-clear-textbox', methods=['POST'])
 def auto_clear_textbox():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
 
     if not ticket_id:
@@ -952,7 +959,7 @@ def auto_clear_textbox():
 
         # อัปเดต Google Sheets
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
         client = gspread.authorize(creds)
         sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
@@ -988,6 +995,13 @@ def clear_textboxes():
         """)
         tickets_with_textbox = [row[0] for row in cur.fetchall()]
 
+        if not tickets_with_textbox:
+            return jsonify({
+                "success": True,
+                "cleared_count": 0,
+                "message": "No textboxes to clear"
+            })
+
         # 2. ลบ textbox ใน PostgreSQL
         cur.execute("""
             UPDATE tickets 
@@ -995,34 +1009,30 @@ def clear_textboxes():
             WHERE textbox IS NOT NULL AND textbox != ''
         """)
 
-        # 3. อัปเดต Google Sheets
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        
-        # ตรวจสอบว่าไฟล์ credentials.json มีอยู่
-        if not os.path.exists('credentials.json'):
-            print("❌ credentials.json not found, skipping Google Sheets update")
-            conn.commit()
-            return jsonify({
-                "success": True,
-                "cleared_count": len(tickets_with_textbox),
-                "message": f"Cleared {len(tickets_with_textbox)} textboxes in database only"
-            })
-            
-        creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-        client = gspread.authorize(creds)
-        sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
+        # 3. อัปเดต Google Sheets (ถ้ามี credentials)
+        try:
+            if os.path.exists('credentials.json'):
+                scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+                creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
+                client = gspread.authorize(creds)
+                sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
-        headers = sheet.row_values(1)
-        if "TEXTBOX" in headers:
-            textbox_col = headers.index("TEXTBOX") + 1
-            
-            for ticket_id in tickets_with_textbox:
-                try:
-                    cell = sheet.find(ticket_id)
-                    if cell:
-                        sheet.update_cell(cell.row, textbox_col, '')
-                except gspread.exceptions.CellNotFound:
-                    continue
+                headers = sheet.row_values(1)
+                if "TEXTBOX" in headers:
+                    textbox_col = headers.index("TEXTBOX") + 1
+                    
+                    for ticket_id in tickets_with_textbox:
+                        try:
+                            cell = sheet.find(ticket_id)
+                            if cell:
+                                sheet.update_cell(cell.row, textbox_col, '')
+                        except Exception as e:
+                            if "not found" in str(e).lower():
+                                continue
+
+        except Exception as e:
+            print(f"Google Sheets update error: {str(e)}")
+            # ไม่ต้อง return error ตรงนี้ เพราะ PostgreSQL อัปเดตแล้ว
 
         conn.commit()
         return jsonify({
@@ -1035,7 +1045,10 @@ def clear_textboxes():
         print(f"Error in clear_textboxes: {str(e)}")
         if 'conn' in locals():
             conn.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "error": str(e),
+            "success": False
+        }), 500
     finally:
         if 'conn' in locals():
             conn.close()
@@ -1044,6 +1057,8 @@ def clear_textboxes():
 @app.route('/refresh-messages', methods=['POST'])
 def refresh_messages():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
 
@@ -1107,6 +1122,8 @@ def update_textbox():
         return jsonify({"error": "Content-Type must be application/json"}), 415
 
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get("ticket_id")
     new_text = data.get("textbox")
     is_announcement = data.get("is_announcement", False)
@@ -1151,14 +1168,14 @@ def update_textbox():
     # 2. Update Google Sheets
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
         client = gspread.authorize(creds)
         sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
         cell = sheet.find(ticket_id)
+        headers = sheet.row_values(1)
         if cell:
-            headers = sheet.row_values(1)
-            if "TEXTBOX" in headers:
+            if new_text is not None and "TEXTBOX" in headers:
                 textbox_col = headers.index("TEXTBOX") + 1
                 sheet.update_cell(cell.row, textbox_col, new_text)
             return jsonify({"message": "✅ Updated textbox in PostgreSQL and Google Sheets"})
@@ -1203,6 +1220,8 @@ def get_email_rankings():
 @app.route('/send-announcement', methods=['POST'])
 def send_announcement():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     announcement_message = data.get('message')
 
     if not announcement_message:
@@ -1244,7 +1263,7 @@ def send_announcement():
 
         # 3. อัปเดต Google Sheets
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
         client = gspread.authorize(creds)
         sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
@@ -1258,8 +1277,9 @@ def send_announcement():
                     cell = sheet.find(ticket_id)
                     if cell:
                         sheet.update_cell(cell.row, textbox_col, full_message)
-                except gspread.exceptions.CellNotFound:
-                    continue
+                except Exception as e:
+                    if "not found" in str(e).lower():
+                        continue
 
         # 4. สร้าง notification ในระบบ
         cur.execute(
@@ -1459,6 +1479,8 @@ def send_textbox_message(user_id, message_text):
 @app.route('/delete-notification', methods=['POST'])
 def delete_notification():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     notification_id = data.get('id')
     
     if not notification_id:
@@ -1545,6 +1567,8 @@ def update_ticket():
         return jsonify({"error": "Content-Type must be application/json"}), 415
 
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
     new_textbox = data.get("textbox")
@@ -1566,21 +1590,24 @@ def update_ticket():
 
     # --- 2. อัปเดต Google Sheets ---
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
     client = gspread.authorize(creds)
     sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
     try:
         cell = sheet.find(ticket_id)
         headers = sheet.row_values(1)
-        if new_status is not None and "สถานะ" in headers:
-            status_col = headers.index("สถานะ") + 1
-            sheet.update_cell(cell.row, status_col, new_status)
-        if new_textbox is not None and "TEXTBOX" in headers:
-            textbox_col = headers.index("TEXTBOX") + 1
-            sheet.update_cell(cell.row, textbox_col, new_textbox)
-    except gspread.exceptions.CellNotFound:
-        return jsonify({"error": "Ticket ID not found in sheet"}), 404
+        if cell:
+            if new_status is not None and "สถานะ" in headers:
+                status_col = headers.index("สถานะ") + 1
+                sheet.update_cell(cell.row, status_col, new_status)
+            if new_textbox is not None and "TEXTBOX" in headers:
+                textbox_col = headers.index("TEXTBOX") + 1
+                sheet.update_cell(cell.row, textbox_col, new_textbox)
+    except Exception as e:
+        if "not found" in str(e).lower():
+            return jsonify({"error": "Ticket not found in Google Sheets"}), 404
+        return jsonify({"error": "Ticket not found in Google Sheets"}), 404
 
     return jsonify({"message": "✅ Ticket updated in PostgreSQL and Google Sheets"})
 
@@ -1636,6 +1663,8 @@ def get_messages():
 @app.route('/api/messages', methods=['POST'])
 def add_message():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
     sender_name = data.get('sender_name')
@@ -1671,24 +1700,28 @@ def add_message():
         
         # อัปเดต Google Sheets ให้ textbox เป็นค่าว่าง
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
         client = gspread.authorize(creds)
         sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
         try:
             cell = sheet.find(ticket_id)
             headers = sheet.row_values(1)
-            if "TEXTBOX" in headers:
+            if cell and "TEXTBOX" in headers:
                 textbox_col = headers.index("TEXTBOX") + 1
                 sheet.update_cell(cell.row, textbox_col, '')
-        except gspread.exceptions.CellNotFound:
-            pass  # ไม่ต้องทำอะไรถ้าไม่พบ ticket ใน sheet
+        except Exception as e:
+            if "not found" in str(e).lower():
+                pass  # ไม่ต้องทำอะไรถ้าไม่พบ ticket ใน sheet
         
-        return jsonify({
-            "id": new_message[0],
-            "timestamp": new_message[1].isoformat(),
-            "success": True
-        })
+        if new_message:
+            return jsonify({
+                "id": new_message[0],
+                "timestamp": new_message[1].isoformat(),
+                "success": True
+            })
+        else:
+            return jsonify({"error": "Failed to create message"}), 500
         
     except Exception as e:
         conn.rollback()
@@ -1700,6 +1733,8 @@ def add_message():
 @app.route('/api/messages/mark-read', methods=['POST'])
 def mark_messages_read():
     data = request.json
+    if not data:
+        return jsonify({"error": "Invalid JSON data"}), 400
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
 
