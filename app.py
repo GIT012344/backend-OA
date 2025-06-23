@@ -779,31 +779,31 @@ def sync_tickets():
 
 @app.route('/update-status', methods=['POST'])
 def update_status():
-    app.logger.info(f"Received data: {request.json}")
+    app.logger.info(f"Received update-status request: {request.json}")
 
-    # 1. ตรวจสอบข้อมูลเบื้องต้น
+    # 1. Validate request
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 415
 
+    data = request.get_json()
+    
+    # 2. Check required fields
+    required_fields = ['ticket_id', 'new_status']
+    missing_fields = [f for f in required_fields if f not in data]
+    if missing_fields:
+        return jsonify({
+            "error": "Missing required fields",
+            "missing": missing_fields
+        }), 400
+
+    ticket_id = data['ticket_id']
+    new_status = data['new_status']
+    user_id = data.get('user_id')
+    admin_id = data.get('admin_id')
+
+    # 3. Connect to database
+    conn = None
     try:
-        data = request.get_json()
-        app.logger.info(f"Received update-status request: {data}")
-
-        # 2. ตรวจสอบ field จำเป็น
-        required_fields = ['ticket_id', 'new_status']
-        if not all(field in data for field in required_fields):
-            missing = [f for f in required_fields if f not in data]
-            return jsonify({
-                "error": "Missing required fields",
-                "missing": missing
-            }), 400
-
-        ticket_id = data['ticket_id']
-        new_status = data['new_status']
-        user_id = data.get('user_id')
-        admin_id = data.get('admin_id')
-
-        # 3. เชื่อมต่อฐานข้อมูล
         conn = psycopg2.connect(
             dbname=DB_NAME,
             user=DB_USER,
@@ -813,7 +813,7 @@ def update_status():
         )
         cur = conn.cursor()
 
-        # 4. ดึงข้อมูลปัจจุบันเพื่อตรวจสอบ
+        # 4. Get current ticket data
         cur.execute("""
             SELECT status, user_id, name, email 
             FROM tickets 
@@ -827,7 +827,7 @@ def update_status():
 
         current_status, db_user_id, name, email = ticket
 
-        # 5. ตรวจสอบว่าสถานะเปลี่ยนจริงหรือไม่
+        # 5. Check if status actually changed
         if current_status == new_status:
             return jsonify({
                 "message": "Status unchanged",
@@ -835,7 +835,7 @@ def update_status():
                 "status": new_status
             }), 200
 
-        # 6. อัปเดตสถานะใน PostgreSQL
+        # 6. Update status in PostgreSQL
         cur.execute("""
             UPDATE tickets 
             SET status = %s 
@@ -846,7 +846,7 @@ def update_status():
         updated_ticket = cur.fetchone()
         conn.commit()
 
-        # 7. บันทึกประวัติการเปลี่ยนแปลง
+        # 7. Log status change
         change_message = f"Status changed from {current_status} to {new_status}"
         if admin_id:
             change_message += f" by admin {admin_id}"
@@ -866,7 +866,7 @@ def update_status():
         ))
         conn.commit()
 
-        # 8. ส่ง LINE Notification (ถ้ามี user_id)
+        # 8. Send LINE notification if user exists
         line_sent = False
         if db_user_id or user_id:
             target_user = db_user_id or user_id
@@ -880,7 +880,7 @@ def update_status():
             }
             line_sent = notify_user(payload)
 
-        # 9. อัปเดต Google Sheets (ถ้ามี credentials)
+        # 9. Update Google Sheets if configured
         sheet_updated = False
         if os.path.exists(CREDENTIALS_FILE):
             try:
@@ -900,7 +900,7 @@ def update_status():
             except Exception as e:
                 app.logger.error(f"Google Sheets update error: {str(e)}")
 
-        # 10. ส่งคำตอบกลับ
+        # 10. Return success response
         response = {
             "success": True,
             "ticket_id": ticket_id,
@@ -914,7 +914,8 @@ def update_status():
         return jsonify(response), 200
 
     except psycopg2.Error as db_error:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         app.logger.error(f"Database error: {str(db_error)}")
         return jsonify({
             "error": "Database operation failed",
@@ -929,7 +930,7 @@ def update_status():
         }), 500
 
     finally:
-        if 'conn' in locals():
+        if conn:
             conn.close()
 
 
