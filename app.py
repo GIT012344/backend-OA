@@ -13,11 +13,8 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 CORS(app, resources={
-    r"/.*": {
-        "origins": [
-            "https://frontend-oa.onrender.com",
-            "http://localhost:3000"
-        ],
+    r"/*": {
+        "origins": ["https://frontend-oa.onrender.com", "http://localhost:3000"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-API-KEY"],
         "supports_credentials": True,
@@ -59,6 +56,7 @@ DB_PORT = 5432  # path ไปยังไฟล์ service account
 
 # เพิ่ม API Key Verification
 API_KEYS = {
+    "frontend": "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU=",
     "apps-script": "https://script.google.com/macros/s/AKfycbzjF4FD4JuHqnuw1Kd1Et8--u8JNUn3s5SzDUakMmN8F0_Zha6U9JAOeF6Z2BHyDOVhsg/exec"
 }
 
@@ -793,7 +791,7 @@ def sync_tickets():
         print(f"Error in sync_tickets: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/update-status', methods=['POST'])
+@app.route('/update-status', methods=['POST', 'OPTIONS'])
 def update_status():
     app.logger.info(f"Received update-status request: {request.json}")
     if request.method == 'OPTIONS':
