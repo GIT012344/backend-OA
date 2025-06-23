@@ -13,18 +13,29 @@ logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 
 
+# Update your CORS configuration to be more permissive
 CORS(app, resources={
     r"/*": {
         "origins": [
             "https://frontend-oa.onrender.com",
-            "http://localhost:3000"  # สำหรับ development
+            "http://localhost:3000"
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,
-        "expose_headers": ["Content-Type"]
+        "max_age": 86400
     }
 })
+
+# Add this after_request handler
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'https://frontend-oa.onrender.com')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Max-Age', '86400')
+    return response
 
 # ใน Flask
 CORS(app, resources={
@@ -37,17 +48,6 @@ CORS(app, resources={
         "allow_headers": ["Content-Type", "Authorization"]
     }
 })
-
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'https://frontend-oa.onrender.com')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    response.headers.add('Access-Control-Expose-Headers', 'Content-Type')
-    return response
-
-
 
 # PostgreSQL config
 DB_NAME = 'datagit'
@@ -796,7 +796,20 @@ def sync_tickets():
 @app.route('/update-status', methods=['POST'])
 def update_status():
     app.logger.info(f"Received update-status request: {request.json}")
+    if request.method == 'OPTIONS':
+        response = jsonify({'success': True})
+        response.headers.add('Access-Control-Allow-Origin', 'https://frontend-oa.onrender.com')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response, 200
 
+    data = request.get_json()
+    ticket_id = data.get('ticket_id')
+    new_status = data.get('status')
+
+    if not ticket_id or not new_status:
+        return jsonify({"error": "Missing ticket_id or status"}), 400
     # 1. Validate request
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 415
@@ -825,6 +838,7 @@ def update_status():
             "new_status": new_status,
             "is_test": True
         }), 200
+
 
     # 3. Connect to database
     conn = None
@@ -926,8 +940,9 @@ def update_status():
                         sheet_updated = True
             except Exception as e:
                 app.logger.error(f"Google Sheets update error: {str(e)}")
+        
 
-        # 10. Return success response
+        # 10.turn success response
         response = {
             "success": True,
             "ticket_id": ticket_id,
@@ -939,6 +954,7 @@ def update_status():
         }
 
         return jsonify(response), 200
+        
 
     except psycopg2.Error as db_error:
         if conn:
