@@ -6,23 +6,69 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import os
+from flask_caching import Cache
+from flask_sqlalchemy import SQLAlchemy
+
 LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
 
 app = Flask(__name__)
+cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 CORS(app)
 
-# PostgreSQL config
 DB_NAME = 'datagit'
 DB_USER = 'git'
 DB_PASSWORD = '4H9c9zbnSxqdrQVUY2ErAtJwzJINcfNn'
 DB_HOST = 'dpg-d19qj8bipnbc739c4aq0-a.singapore-postgres.render.com'
 DB_PORT = 5432
 
+# Flask-SQLAlchemy configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
 # Google Sheets config
 SHEET_NAME = 'Tickets'  # ชื่อ Google Sheet ที่มีข้อมูล
 WORKSHEET_NAME = 'Sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
 CREDENTIALS_FILE = 'credentials.json'
+
+# Define SQLAlchemy models
+class Ticket(db.Model):
+    __tablename__ = 'tickets'
+    
+    ticket_id = db.Column(db.String, primary_key=True)
+    user_id = db.Column(db.String)
+    email = db.Column(db.String)
+    name = db.Column(db.String)
+    phone = db.Column(db.String)
+    department = db.Column(db.String)
+    created_at = db.Column(db.DateTime)
+    status = db.Column(db.String)
+    appointment = db.Column(db.String)
+    requested = db.Column(db.String)
+    report = db.Column(db.String)
+    type = db.Column(db.String)
+    textbox = db.Column(db.String)
+
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    message = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    read = db.Column(db.Boolean, default=False)
+
+class Message(db.Model):
+    __tablename__ = 'messages'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.String, db.ForeignKey('tickets.ticket_id'))
+    admin_id = db.Column(db.String)
+    sender_name = db.Column(db.String)
+    message = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    is_read = db.Column(db.Boolean, default=False)
+    is_admin_message = db.Column(db.Boolean, default=False)
 
 def send_textbox_message(user_id, message_text):
     url = "https://api.line.me/v2/bot/message/push"
@@ -516,154 +562,105 @@ def sync_google_sheet_to_postgres():
 
 @app.route('/api/notifications')
 def get_notifications():
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
+    # Get last 20 notifications, newest first using SQLAlchemy
+    notifications = Notification.query.order_by(Notification.timestamp.desc()).limit(20).all()
     
-    # Get last 20 notifications, newest first
-    cur.execute("""
-        SELECT id, message, timestamp, read 
-        FROM notifications 
-        ORDER BY timestamp DESC 
-        LIMIT 20
-    """)
-    
-    notifications = []
-    for row in cur.fetchall():
-        notifications.append({
-            "id": row[0],
-            "message": row[1],
-            "timestamp": row[2].isoformat(),
-            "read": row[3]
+    result = []
+    for notification in notifications:
+        result.append({
+            "id": notification.id,
+            "message": notification.message,
+            "timestamp": notification.timestamp.isoformat(),
+            "read": notification.read
         })
     
-    conn.close()
-    return jsonify(notifications)
+    return jsonify(result)
 
 # Add a route to mark notifications as read
 @app.route('/mark-notification-read', methods=['POST'])
 def mark_notification_read():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+        
     notification_id = data.get('id')
     
     if not notification_id:
         return jsonify({"error": "Notification ID required"}), 400
     
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    cur.execute("UPDATE notifications SET read = TRUE WHERE id = %s", (notification_id,))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"success": True})
+    try:
+        notification = Notification.query.get(notification_id)
+        if notification:
+            notification.read = True
+            db.session.commit()
+            return jsonify({"success": True})
+        else:
+            return jsonify({"error": "Notification not found"}), 404
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 # Add a route to mark all notifications as read
 @app.route('/mark-all-notifications-read', methods=['POST'])
 def mark_all_notifications_read():
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    cur.execute("UPDATE notifications SET read = TRUE WHERE read = FALSE")
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"success": True})
+    try:
+        # Update all unread notifications
+        Notification.query.filter_by(read=False).update({"read": True})
+        db.session.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 def create_tickets_table():
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS tickets (
-        ticket_id TEXT PRIMARY KEY,
-        user_id TEXT,
-        email TEXT,
-        name TEXT,
-        phone TEXT,
-        department TEXT,
-        created_at TIMESTAMP,
-        status TEXT,
-        appointment TEXT,
-        requested TEXT,
-        report TEXT,
-        type TEXT,
-        textbox TEXT
-    );
-    """)
-    
-    # Add notifications table
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS notifications (
-        id SERIAL PRIMARY KEY,
-        message TEXT NOT NULL,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        read BOOLEAN DEFAULT FALSE
-    );
-    """)
-    
-    # เพิ่มตาราง messages สำหรับเก็บประวัติการสนทนา
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS messages (
-        id SERIAL PRIMARY KEY,
-        ticket_id TEXT REFERENCES tickets(ticket_id),
-        admin_id TEXT,
-        sender_name TEXT,
-        message TEXT NOT NULL,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_read BOOLEAN DEFAULT FALSE,
-        is_admin_message BOOLEAN DEFAULT FALSE
-    );
-    """)
-    
-    conn.commit()
-    conn.close()
-
+    # Create all tables using SQLAlchemy
+    db.create_all()
 
 def parse_datetime(date_str):
     try:
         return datetime.fromisoformat(date_str)
     except Exception:
         return None
-  
+
 @app.route('/api/data')
+@cache.cached(timeout=60) 
 def get_data():
-    conn = psycopg2.connect(
-    dbname=DB_NAME,
-    user=DB_USER,
-    password=DB_PASSWORD,
-    host=DB_HOST,
-    port=DB_PORT)
-    cur = conn.cursor()
-    cur.execute("""SELECT ticket_id, email, name, phone, department, created_at, status, appointment, requested, report, type, textbox FROM tickets;""")
-    rows = cur.fetchall()
-    conn.close()
-    result = [
-    {
-        "Ticket ID": row[0],
-        "อีเมล": row[1],
-        "ชื่อ": row[2],
-        "เบอร์ติดต่อ": row[3],
-        "แผนก": row[4],
-        "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
-        "สถานะ": row[6],
-        "Appointment": row[7],
-        "Requeste": row[8],
-        "Report": row[9],
-        "Type": row[10],
-        "TEXTBOX": row[11]
-    }
-    for row in rows
-]
-    return jsonify(result)
+    try:
+        # Use SQLAlchemy to query tickets
+        tickets = Ticket.query.order_by(Ticket.created_at.desc()).limit(1000).all()
+        
+        result = [
+            {
+                "Ticket ID": ticket.ticket_id,
+                "อีเมล": ticket.email,
+                "ชื่อ": ticket.name,
+                "เบอร์ติดต่อ": ticket.phone,
+                "แผนก": ticket.department,
+                "วันที่แจ้ง": ticket.created_at.isoformat() if ticket.created_at else "",
+                "สถานะ": ticket.status,
+                "Appointment": ticket.appointment,
+                "Requeste": ticket.requested,
+                "Report": ticket.report,
+                "Type": ticket.type
+            }
+            for ticket in tickets
+        ]
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ Unexpected error in get_data: {str(e)}")
+        return jsonify({
+            "error": "Internal server error",
+            "message": str(e)
+        }), 500
 
 @app.route('/update-status', methods=['POST'])
 def update_status():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+        
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
 
@@ -671,37 +668,23 @@ def update_status():
         return jsonify({"error": "ticket_id and status required"}), 400
 
     try:
-        # 1. Update PostgreSQL
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-        )
-        cur = conn.cursor()
-
-        # Get current status
-        cur.execute("SELECT status FROM tickets WHERE ticket_id = %s", (ticket_id,))
-        result = cur.fetchone()
-        
-        if not result:
-            conn.close()
+        # 1. Update PostgreSQL using SQLAlchemy
+        ticket = Ticket.query.get(ticket_id)
+        if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
             
-        current_status = result[0]
+        current_status = ticket.status
 
         # Only proceed if status is actually changing
         if current_status != new_status:
             # Update status
-            cur.execute("UPDATE tickets SET status = %s WHERE ticket_id = %s", (new_status, ticket_id))
+            ticket.status = new_status
             
-            # Get ticket details for notification
-            cur.execute("SELECT name, email FROM tickets WHERE ticket_id = %s", (ticket_id,))
-            ticket = cur.fetchone()
+            # Create notification
+            notification = Notification(message=f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}")
+            db.session.add(notification)
             
-            if ticket:
-                name, email = ticket
-                message = f"Ticket #{ticket_id} ({name}) changed from {current_status} to {new_status}"
-                cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
-            
-            conn.commit()
+            db.session.commit()
             
             # 2. Update Google Sheets
             scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -744,38 +727,29 @@ def update_status():
             return jsonify({"message": "Status unchanged"})
             
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        if 'conn' in locals():
-            conn.close()
-
 
 @app.route('/delete-ticket', methods=['POST'])
 def delete_ticket():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+        
     ticket_id = data.get('ticket_id')
 
     if not ticket_id:
         return jsonify({"error": "Ticket ID is required"}), 400
 
     try:
-        # 1. ลบจาก PostgreSQL
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-            host=DB_HOST, port=DB_PORT
-        )
-        cur = conn.cursor()
-        
-        # ตรวจสอบว่ามี ticket นี้หรือไม่
-        cur.execute('SELECT ticket_id FROM tickets WHERE ticket_id = %s', (ticket_id,))
-        if not cur.fetchone():
-            conn.close()
+        # 1. ลบจาก PostgreSQL using SQLAlchemy
+        ticket = Ticket.query.get(ticket_id)
+        if not ticket:
             return jsonify({"error": "Ticket not found in database"}), 404
         
         # ลบจาก PostgreSQL
-        cur.execute('DELETE FROM tickets WHERE ticket_id = %s', (ticket_id,))
-        conn.commit()
-        conn.close()
+        db.session.delete(ticket)
+        db.session.commit()
 
         # 2. ลบจาก Google Sheets
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -791,17 +765,9 @@ def delete_ticket():
                 sheet.delete_rows(cell.row)
                 
                 # สร้าง notification
-                conn = psycopg2.connect(
-                    dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-                    host=DB_HOST, port=DB_PORT
-                )
-                cur = conn.cursor()
-                cur.execute(
-                    "INSERT INTO notifications (message) VALUES (%s)",
-                    (f"Ticket {ticket_id} has been deleted",)
-                )
-                conn.commit()
-                conn.close()
+                notification = Notification(message=f"Ticket {ticket_id} has been deleted")
+                db.session.add(notification)
+                db.session.commit()
                 
                 return jsonify({"success": True, "message": "Ticket deleted from both PostgreSQL and Google Sheets"})
             else:
@@ -810,59 +776,49 @@ def delete_ticket():
             return jsonify({"error": "Ticket not found in Google Sheets"}), 404
 
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/messages/delete', methods=['POST'])
 def delete_messages():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+        
     ticket_id = data.get('ticket_id')
 
     if not ticket_id:
         return jsonify({"error": "Ticket ID is required"}), 400
 
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    
     try:
         # ลบข้อความทั้งหมดที่เกี่ยวข้องกับ ticket_id นี้
-        cur.execute("""
-            DELETE FROM messages 
-            WHERE ticket_id = %s
-        """, (ticket_id,))
-        
-        conn.commit()
+        Message.query.filter_by(ticket_id=ticket_id).delete()
+        db.session.commit()
         return jsonify({"success": True, "message": "Messages deleted successfully"})
     except Exception as e:
-        conn.rollback()
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        if 'conn' in locals():
-            conn.close()
 
 @app.route('/auto-clear-textbox', methods=['POST'])
 def auto_clear_textbox():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+        
     ticket_id = data.get('ticket_id')
 
     if not ticket_id:
         return jsonify({"error": "Ticket ID is required"}), 400
 
     try:
-        # เชื่อมต่อกับฐานข้อมูล
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, 
-            password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-        )
-        cur = conn.cursor()
+        # เชื่อมต่อกับฐานข้อมูล using SQLAlchemy
+        ticket = Ticket.query.get(ticket_id)
+        if not ticket:
+            return jsonify({"error": "Ticket not found"}), 404
 
         # ลบข้อมูลในตาราง tickets
-        cur.execute("""
-            UPDATE tickets 
-            SET textbox = '' 
-            WHERE ticket_id = %s
-        """, (ticket_id,))
+        ticket.textbox = ''
+        db.session.commit()
 
         # อัปเดต Google Sheets
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -877,38 +833,29 @@ def auto_clear_textbox():
                 textbox_col = headers.index("TEXTBOX") + 1
                 sheet.update_cell(cell.row, textbox_col, '')
 
-        conn.commit()
         return jsonify({"success": True, "message": "Textbox cleared automatically"})
 
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        if 'conn' in locals():
-            conn.close()
+
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
 
 @app.route('/clear-textboxes', methods=['POST'])
 def clear_textboxes():
     try:
-        # เชื่อมต่อกับฐานข้อมูล
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, 
-            password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-        )
-        cur = conn.cursor()
-
-        # 1. ค้นหา tickets ที่มี textbox ไม่ว่าง
-        cur.execute("""
-            SELECT ticket_id, textbox FROM tickets 
-            WHERE textbox IS NOT NULL AND textbox != ''
-        """)
-        tickets_with_textbox = cur.fetchall()
+        # 1. ค้นหา tickets ที่มี textbox ไม่ว่าง using SQLAlchemy
+        tickets_with_textbox = Ticket.query.filter(
+            Ticket.textbox.isnot(None), 
+            Ticket.textbox != ''
+        ).all()
 
         # 2. ลบ textbox ใน PostgreSQL
-        cur.execute("""
-            UPDATE tickets 
-            SET textbox = '' 
-            WHERE textbox IS NOT NULL AND textbox != ''
-        """)
+        for ticket in tickets_with_textbox:
+            ticket.textbox = ''
+        db.session.commit()
 
         # 3. อัปเดต Google Sheets
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -921,15 +868,13 @@ def clear_textboxes():
             textbox_col = headers.index("TEXTBOX") + 1
             
             for ticket in tickets_with_textbox:
-                ticket_id = ticket[0]
                 try:
-                    cell = sheet.find(ticket_id)
+                    cell = sheet.find(ticket.ticket_id)
                     if cell:
                         sheet.update_cell(cell.row, textbox_col, '')
                 except gspread.exceptions.CellNotFound:
                     continue
 
-        conn.commit()
         return jsonify({
             "success": True,
             "cleared_count": len(tickets_with_textbox),
@@ -937,15 +882,12 @@ def clear_textboxes():
         })
 
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        if 'conn' in locals():
-            conn.close()
-            
 
 @app.route('/refresh-messages', methods=['POST'])
 def refresh_messages():
-    data = request.json
+    data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
         
@@ -955,53 +897,42 @@ def refresh_messages():
     if not ticket_id:
         return jsonify({"error": "Ticket ID is required"}), 400
 
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    
     try:
-        # ดึงข้อความล่าสุด
-        cur.execute("""
-            SELECT id, ticket_id, admin_id, sender_name, message, 
-                   timestamp, is_read, is_admin_message
-            FROM messages
-            WHERE ticket_id = %s
-            ORDER BY timestamp ASC
-        """, (ticket_id,))
+        # ดึงข้อความล่าสุด using SQLAlchemy
+        messages = Message.query.filter_by(ticket_id=ticket_id).order_by(Message.timestamp.asc()).all()
         
-        messages = []
-        for row in cur.fetchall():
-            messages.append({
-                "id": row[0],
-                "ticket_id": row[1],
-                "admin_id": row[2],
-                "sender_name": row[3],
-                "message": row[4],
-                "timestamp": row[5].isoformat(),
-                "is_read": row[6],
-                "is_admin_message": row[7]
+        result = []
+        for message in messages:
+            result.append({
+                "id": message.id,
+                "ticket_id": message.ticket_id,
+                "admin_id": message.admin_id,
+                "sender_name": message.sender_name,
+                "message": message.message,
+                "timestamp": message.timestamp.isoformat(),
+                "is_read": message.is_read,
+                "is_admin_message": message.is_admin_message
             })
         
         # ทำเครื่องหมายว่าข้อความถูกอ่านแล้ว
         if admin_id:
-            cur.execute("""
-                UPDATE messages
-                SET is_read = TRUE
-                WHERE ticket_id = %s 
-                AND (admin_id IS NULL OR admin_id = %s)
-                AND is_read = FALSE
-            """, (ticket_id, admin_id))
+            Message.query.filter(
+                Message.ticket_id == ticket_id,
+                (Message.admin_id.is_(None) | (Message.admin_id == admin_id)),
+                Message.is_read == False
+            ).update({"is_read": True})
+        else:
+            Message.query.filter(
+                Message.ticket_id == ticket_id,
+                Message.is_read == False
+            ).update({"is_read": True})
         
-        conn.commit()
-        return jsonify({"messages": messages, "success": True})
+        db.session.commit()
+        return jsonify({"messages": result, "success": True})
         
     except Exception as e:
-        conn.rollback()
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        if 'conn' in locals():
-            conn.close()
 
 @app.route('/update-textbox', methods=['POST', 'OPTIONS'])
 def update_textbox():

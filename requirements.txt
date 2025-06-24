@@ -7,5 +7,6 @@ gspread
 google-auth
 google-auth-oauthlib
 python-dotenv
+Flask-Caching
 
 
