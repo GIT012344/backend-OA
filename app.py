@@ -742,42 +742,60 @@ def delete_ticket():
         return jsonify({"error": "Ticket ID is required"}), 400
 
     try:
-        # 1. ลบจาก PostgreSQL using SQLAlchemy
+        # 1. ลบข้อความที่เกี่ยวข้องก่อน
+        Message.query.filter_by(ticket_id=ticket_id).delete()
+        
+        # 2. ลบ ticket จาก PostgreSQL
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
             return jsonify({"error": "Ticket not found in database"}), 404
         
-        # ลบจาก PostgreSQL
         db.session.delete(ticket)
+        
+        # 3. สร้าง notification
+        notification = Notification(message=f"Ticket {ticket_id} has been deleted")
+        db.session.add(notification)
+        
         db.session.commit()
 
-        # 2. ลบจาก Google Sheets
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-        client = gspread.authorize(creds)
-        sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
-        # หาแถวที่ต้องการลบ
+        # 4. ลบจาก Google Sheets
         try:
+            scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+            creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
+            client = gspread.authorize(creds)
+            sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
+
             cell = sheet.find(ticket_id)
             if cell:
-                # ลบแถวใน Google Sheets
                 sheet.delete_rows(cell.row)
-                
-                # สร้าง notification
-                notification = Notification(message=f"Ticket {ticket_id} has been deleted")
-                db.session.add(notification)
-                db.session.commit()
-                
-                return jsonify({"success": True, "message": "Ticket deleted from both PostgreSQL and Google Sheets"})
+                return jsonify({
+                    "success": True, 
+                    "message": "Ticket deleted from both PostgreSQL and Google Sheets"
+                })
             else:
-                return jsonify({"error": "Ticket not found in Google Sheets"}), 404
+                return jsonify({
+                    "success": True,
+                    "message": "Ticket deleted from database but not found in Google Sheets"
+                }), 200
         except gspread.exceptions.CellNotFound:
-            return jsonify({"error": "Ticket not found in Google Sheets"}), 404
+            return jsonify({
+                "success": True,
+                "message": "Ticket deleted from database but not found in Google Sheets"
+            }), 200
+        except Exception as e:
+            print(f"Google Sheets deletion error: {str(e)}")
+            return jsonify({
+                "success": True,
+                "message": f"Ticket deleted from database but Google Sheets error: {str(e)}"
+            }), 200
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        print(f"Error deleting ticket: {str(e)}")
+        return jsonify({
+            "error": "Failed to delete ticket",
+            "details": str(e)
+        }), 500
 
 @app.route('/api/messages/delete', methods=['POST'])
 def delete_messages():
