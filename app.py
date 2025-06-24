@@ -6,13 +6,24 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import os
+from datetime import timedelta
 from flask_caching import Cache
 from flask_sqlalchemy import SQLAlchemy
+from flask_jwt_extended import (
+    JWTManager, jwt_required, create_access_token,
+    get_jwt_identity
+)
+from werkzeug.security import generate_password_hash, check_password_hash
+import bcrypt
 
 LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+
+app.config['JWT_SECRET_KEY'] = 'your-secret-key-here'  # ควรเปลี่ยนเป็นค่าที่ปลอดภัยใน production
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)  # Token หมดอายุใน 1 ชั่วโมง
+jwt = JWTManager(app)
 
 CORS(app)
 
@@ -622,7 +633,66 @@ def parse_datetime(date_str):
     except Exception:
         return None
 
+class User(db.Model):
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    role = db.Column(db.String(20), default='user')  # 'user' หรือ 'admin'
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+# สร้างตาราง users
+def create_tables():
+    db.create_all()
+    
+    # สร้างผู้ใช้ admin เริ่มต้นถ้ายังไม่มี
+    if not User.query.filter_by(username='admin').first():
+        admin = User(username='admin', role='admin')
+        admin.set_password('admin123')  # เปลี่ยนรหัสผ่านนี้ใน production!
+        db.session.add(admin)
+        db.session.commit()
+
+# เพิ่ม route สำหรับ login
+@app.route('/api/login', methods=['POST'])
+def login():
+    if not request.is_json:
+        return jsonify({"msg": "Missing JSON in request"}), 400
+
+    username = request.json.get('username', None)
+    password = request.json.get('password', None)
+
+    if not username or not password:
+        return jsonify({"msg": "Missing username or password"}), 400
+
+    user = User.query.filter_by(username=username).first()
+    if not user or not user.check_password(password):
+        return jsonify({"msg": "Bad username or password"}), 401
+
+    access_token = create_access_token(identity={
+        'username': user.username,
+        'role': user.role
+    })
+    return jsonify(access_token=access_token), 200
+
+# เพิ่ม route สำหรับตรวจสอบ token
+@app.route('/api/protected', methods=['GET'])
+@jwt_required()
+def protected():
+    current_user = get_jwt_identity()
+    return jsonify(logged_in_as=current_user), 200
+
+
+
+
+
 @app.route('/api/data')
+@jwt_required()
 @cache.cached(timeout=60) 
 def get_data():
     try:
@@ -1536,6 +1606,7 @@ def sync_route():
         }), 500
 
 if __name__ == '__main__':
-    create_tickets_table()
-    sync_google_sheet_to_postgres()
+    with app.app_context():
+        create_tickets_table()
+        sync_google_sheet_to_postgres()
     app.run(host='0.0.0.0', port=5001, debug=False)

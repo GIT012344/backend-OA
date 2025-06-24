@@ -9,5 +9,6 @@ google-auth-oauthlib
 python-dotenv
 Flask-Caching
 flask-sqlalchemy
-
+flask-jwt-extended
+bcrypt
 
