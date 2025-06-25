@@ -672,26 +672,59 @@ def create_tables():
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
+        print(f"Login request received - Content-Type: {request.content_type}")
+        print(f"Request headers: {dict(request.headers)}")
+        
+        # ตรวจสอบ Content-Type
+        if request.content_type and 'application/json' not in request.content_type:
+            print(f"Invalid content type: {request.content_type}")
+            return jsonify({"msg": "Content-Type must be application/json"}), 400
+
+        # ตรวจสอบว่าเป็น JSON หรือไม่
         if not request.is_json:
+            print("Request is not JSON")
+            # ลองอ่าน raw data
+            raw_data = request.get_data(as_text=True)
+            print(f"Raw data: {raw_data}")
             return jsonify({"msg": "Missing JSON in request"}), 400
 
         data = request.get_json()
+        print(f"Received data: {data}")
+        
         if not data:
             return jsonify({"msg": "Missing JSON data"}), 400
 
-        pin = data.get('pin', None)
+        # รองรับหลายรูปแบบของ PIN
+        pin = None
+        if 'pin' in data:
+            pin = data['pin']
+        elif 'username' in data:
+            pin = data['username']  # รองรับ username field
+        elif 'password' in data:
+            pin = data['password']  # รองรับ password field
 
         if not pin:
-            return jsonify({"msg": "Missing PIN"}), 400
+            return jsonify({"msg": "Missing PIN/username/password"}), 400
 
-        # Debug: print received data
-        print(f"Login attempt with PIN: {pin}")
+        # แปลง PIN เป็น string
+        pin = str(pin).strip()
+        
+        print(f"Login attempt with PIN: '{pin}'")
 
-        user = User.query.filter_by(pin=pin).first()
+        # ตรวจสอบว่ามีตาราง users หรือไม่
+        try:
+            user = User.query.filter_by(pin=pin).first()
+            print(f"User found: {user}")
+        except Exception as db_error:
+            print(f"Database error: {db_error}")
+            return jsonify({"msg": "Database connection error"}), 500
+
         if not user:
+            print(f"No user found with PIN: {pin}")
             return jsonify({"msg": "Invalid PIN - User not found"}), 401
         
         if not user.check_pin(pin):
+            print(f"PIN check failed for user: {user.name}")
             return jsonify({"msg": "Invalid PIN - User inactive or PIN mismatch"}), 401
 
         access_token = create_access_token(identity={
@@ -712,6 +745,8 @@ def login():
         
     except Exception as e:
         print(f"Login error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"msg": "Internal server error", "error": str(e)}), 500
 
 # เพิ่ม route สำหรับตรวจสอบ token
@@ -1788,6 +1823,122 @@ def system_status():
             "database": "disconnected",
             "error": str(e),
             "timestamp": datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/init-users')
+def init_users():
+    try:
+        with app.app_context():
+            # สร้างตารางทั้งหมด
+            db.create_all()
+            
+            # สร้างผู้ใช้เริ่มต้นถ้ายังไม่มี
+            if not User.query.filter_by(pin='1234').first():
+                admin = User()
+                admin.pin = '1234'
+                admin.role = 'admin'
+                admin.name = 'ผู้ดูแลระบบ'
+                db.session.add(admin)
+                print("Created admin user with PIN: 1234")
+            
+            if not User.query.filter_by(pin='0000').first():
+                user = User()
+                user.pin = '0000'
+                user.role = 'user'
+                user.name = 'ผู้ใช้ทั่วไป'
+                db.session.add(user)
+                print("Created regular user with PIN: 0000")
+            
+            db.session.commit()
+            
+            # ดึงรายชื่อผู้ใช้ทั้งหมด
+            users = User.query.all()
+            user_list = []
+            for user in users:
+                user_list.append({
+                    "id": user.id,
+                    "pin": user.pin,
+                    "name": user.name,
+                    "role": user.role,
+                    "is_active": user.is_active
+                })
+            
+            return jsonify({
+                "success": True,
+                "message": "Users initialized successfully",
+                "users": user_list
+            })
+            
+    except Exception as e:
+        print(f"Error initializing users: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/test-db')
+def test_database():
+    try:
+        # ทดสอบการเชื่อมต่อ PostgreSQL
+        conn = psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
+            host=DB_HOST, port=DB_PORT
+        )
+        cur = conn.cursor()
+        
+        # ตรวจสอบว่าตาราง users มีอยู่หรือไม่
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'users'
+            );
+        """)
+        result = cur.fetchone()
+        users_table_exists = result[0] if result else False
+        
+        # ตรวจสอบว่าตาราง tickets มีอยู่หรือไม่
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'tickets'
+            );
+        """)
+        result = cur.fetchone()
+        tickets_table_exists = result[0] if result else False
+        
+        # นับจำนวนผู้ใช้
+        user_count = 0
+        if users_table_exists:
+            cur.execute("SELECT COUNT(*) FROM users")
+            result = cur.fetchone()
+            user_count = result[0] if result else 0
+        
+        # นับจำนวน tickets
+        ticket_count = 0
+        if tickets_table_exists:
+            cur.execute("SELECT COUNT(*) FROM tickets")
+            result = cur.fetchone()
+            ticket_count = result[0] if result else 0
+        
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "database_connected": True,
+            "users_table_exists": users_table_exists,
+            "tickets_table_exists": tickets_table_exists,
+            "user_count": user_count,
+            "ticket_count": ticket_count
+        })
+        
+    except Exception as e:
+        print(f"Database test error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "database_connected": False,
+            "error": str(e)
         }), 500
 
 if __name__ == '__main__':
