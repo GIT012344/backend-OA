@@ -545,7 +545,7 @@ def sync_google_sheet_to_postgres():
                     new_textbox
                 ))
             except Exception as e:
-                print(f"❌ Error syncing row: {row.get('Ticket ID', 'N/A')} - {e}")
+                print(f"ERROR: Error syncing row: {row.get('Ticket ID', 'N/A')} - {e}")
         
         # เพิ่ม notification สำหรับ textbox ที่อัปเดต
         for update in textbox_updates:
@@ -569,7 +569,7 @@ def sync_google_sheet_to_postgres():
         
     except Exception as e:
         # จัดการข้อผิดพลาดและบันทึก log
-        print(f"❌ Error in sync_google_sheet_to_postgres: {str(e)}")
+        print(f"ERROR: Error in sync_google_sheet_to_postgres: {str(e)}")
         raise  # ส่งข้อผิดพลาดต่อไปเพื่อให้ Flask จัดการ
 
 @app.route('/api/notifications')
@@ -683,23 +683,23 @@ def login():
         
         # ตรวจสอบ Content-Type
         if request.content_type and 'application/json' not in request.content_type:
-            print(f"❌ Invalid content type: {request.content_type}")
+            print(f"ERROR: Invalid content type: {request.content_type}")
             return jsonify({"msg": "Content-Type must be application/json"}), 400
 
         # ตรวจสอบว่าเป็น JSON หรือไม่
         if not request.is_json:
-            print("❌ Request is not JSON")
+            print("ERROR: Request is not JSON")
             # ลองอ่าน raw data
             raw_data = request.get_data(as_text=True)
             print(f"Raw data: {raw_data}")
             return jsonify({"msg": "Missing JSON in request"}), 400
 
         data = request.get_json()
-        print(f"✅ Received JSON data: {data}")
+        print(f"SUCCESS: Received JSON data: {data}")
         print(f"Data type: {type(data)}")
         
         if not data:
-            print("❌ No data received")
+            print("ERROR: No data received")
             return jsonify({"msg": "Missing JSON data"}), 400
 
         # รองรับหลายรูปแบบของ PIN
@@ -719,36 +719,36 @@ def login():
             pin = data['email']
             print(f"Found 'email' field: {pin}")
         else:
-            print(f"❌ No valid field found. Available fields: {list(data.keys())}")
+            print(f"ERROR: No valid field found. Available fields: {list(data.keys())}")
             return jsonify({"msg": "Missing PIN/username/password/email field"}), 400
 
         if not pin:
-            print("❌ PIN is empty or None")
+            print("ERROR: PIN is empty or None")
             return jsonify({"msg": "Missing PIN/username/password"}), 400
 
         # แปลง PIN เป็น string
         pin = str(pin).strip()
-        print(f"🔐 Login attempt with PIN: '{pin}' (length: {len(pin)})")
+        print(f"LOGIN: Login attempt with PIN: '{pin}' (length: {len(pin)})")
 
         # ตรวจสอบว่ามีตาราง users หรือไม่
         try:
             user = User.query.filter_by(pin=pin).first()
-            print(f"👤 User found: {user}")
+            print(f"USER: User found: {user}")
             if user:
                 print(f"   - ID: {user.id}")
                 print(f"   - Name: {user.name}")
                 print(f"   - Role: {user.role}")
                 print(f"   - Active: {user.is_active}")
         except Exception as db_error:
-            print(f"❌ Database error: {db_error}")
+            print(f"ERROR: Database error: {db_error}")
             return jsonify({"msg": "Database connection error"}), 500
 
         if not user:
-            print(f"❌ No user found with PIN: {pin}")
+            print(f"ERROR: No user found with PIN: {pin}")
             return jsonify({"msg": "Invalid PIN - User not found"}), 401
         
         if not user.check_pin(pin):
-            print(f"❌ PIN check failed for user: {user.name}")
+            print(f"ERROR: PIN check failed for user: {user.name}")
             return jsonify({"msg": "Invalid PIN - User inactive or PIN mismatch"}), 401
 
         access_token = create_access_token(identity={
@@ -757,7 +757,7 @@ def login():
             'name': user.name
         })
         
-        print(f"✅ Login successful for user: {user.name} (PIN: {user.pin})")
+        print(f"SUCCESS: Login successful for user: {user.name} (PIN: {user.pin})")
         print("=" * 50)
         
         return jsonify({
@@ -769,7 +769,7 @@ def login():
         }), 200
         
     except Exception as e:
-        print(f"❌ Login error: {str(e)}")
+        print(f"ERROR: Login error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"msg": "Internal server error", "error": str(e)}), 500
@@ -812,7 +812,7 @@ def get_data():
         return jsonify(result)
         
     except Exception as e:
-        print(f"❌ Unexpected error in get_data: {str(e)}")
+        print(f"ERROR: Unexpected error in get_data: {str(e)}")
         return jsonify({
             "error": "Internal server error",
             "message": str(e)
@@ -885,7 +885,7 @@ def update_status():
 
                     notify_user(payload)
                     
-                return jsonify({"message": "✅ Updated both PostgreSQL and Google Sheets"})
+                return jsonify({"message": "Updated both PostgreSQL and Google Sheets"})
             return jsonify({"error": "Ticket ID not found in sheet"}), 404
         else:
             return jsonify({"message": "Status unchanged"})
@@ -1174,7 +1174,7 @@ def update_textbox():
             if "TEXTBOX" in headers:
                 textbox_col = headers.index("TEXTBOX") + 1
                 sheet.update_cell(cell.row, textbox_col, new_text)
-            return jsonify({"message": "✅ Updated textbox in PostgreSQL and Google Sheets"})
+            return jsonify({"message": "Updated textbox in PostgreSQL and Google Sheets"})
         return jsonify({"error": "Ticket ID not found in sheet"}), 404
     except Exception:
         return jsonify({"error": "Ticket ID not found in sheet"}), 404
@@ -1461,7 +1461,7 @@ def update_ticket():
     except Exception:
         return jsonify({"error": "Ticket ID not found in sheet"}), 404
 
-    return jsonify({"message": "✅ Ticket updated in PostgreSQL and Google Sheets"})
+    return jsonify({"message": "Ticket updated in PostgreSQL and Google Sheets"})
 
 @app.route('/api/data-by-date', methods=['GET'])
 def get_data_by_date():
