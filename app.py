@@ -22,7 +22,10 @@ app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 app.config['JWT_SECRET_KEY'] = 'your-secret-key-here'  # ควรเปลี่ยนเป็นค่าที่ปลอดภัยใน production
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)  # Token หมดอายุใน 1 ชั่วโมง
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)  # Token หมดอายุใน 24 ชั่วโมง
+app.config['JWT_TOKEN_LOCATION'] = ['headers']
+app.config['JWT_HEADER_NAME'] = 'Authorization'
+app.config['JWT_HEADER_TYPE'] = 'Bearer'
 jwt = JWTManager(app)
 
 # แก้ไข CORS ให้รองรับทุก origin
@@ -774,16 +777,58 @@ def login():
         traceback.print_exc()
         return jsonify({"msg": "Internal server error", "error": str(e)}), 500
 
+# เพิ่ม route สำหรับ logout
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    try:
+        # ในระบบ JWT ไม่จำเป็นต้องทำอะไรกับ token เพราะ client จะลบ token เอง
+        # แต่เราสามารถเพิ่ม token ลงใน blacklist ได้ถ้าต้องการ
+        return jsonify({"msg": "Logout successful"}), 200
+    except Exception as e:
+        print(f"Logout error: {str(e)}")
+        return jsonify({"msg": "Logout error"}), 500
+
 # เพิ่ม route สำหรับตรวจสอบ token
 @app.route('/api/protected', methods=['GET'])
 @jwt_required()
 def protected():
-    current_user = get_jwt_identity()
-    return jsonify(logged_in_as=current_user), 200
+    try:
+        current_user = get_jwt_identity()
+        print(f"Protected route accessed by: {current_user}")
+        return jsonify(logged_in_as=current_user), 200
+    except Exception as e:
+        print(f"JWT validation error: {str(e)}")
+        return jsonify({"error": "Invalid token"}), 422
 
-
-
-
+# เพิ่ม route สำหรับตรวจสอบสถานะการล็อกอิน
+@app.route('/api/auth/status', methods=['GET'])
+def auth_status():
+    try:
+        # ตรวจสอบว่ามี Authorization header หรือไม่
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({"authenticated": False, "message": "No token provided"}), 401
+        
+        # ลบ "Bearer " ออกจาก token
+        if not auth_header.startswith('Bearer '):
+            return jsonify({"authenticated": False, "message": "Invalid token format"}), 401
+        
+        token = auth_header.replace('Bearer ', '')
+        
+        # ตรวจสอบ token โดยใช้ JWT
+        try:
+            current_user = get_jwt_identity()
+            return jsonify({
+                "authenticated": True,
+                "user": current_user
+            }), 200
+        except Exception as jwt_error:
+            print(f"JWT validation error: {str(jwt_error)}")
+            return jsonify({"authenticated": False, "message": "Invalid token"}), 401
+        
+    except Exception as e:
+        print(f"Auth status error: {str(e)}")
+        return jsonify({"authenticated": False, "message": "Server error"}), 500
 
 @app.route('/api/data')
 @cache.cached(timeout=60) 
@@ -2018,6 +2063,22 @@ def reset_users():
             "success": False,
             "error": str(e)
         }), 500
+
+@app.route('/')
+def home():
+    return jsonify({
+        "message": "Backend is running",
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat()
+    })
+
+@app.route('/api/test')
+def test_api():
+    return jsonify({
+        "message": "API is working",
+        "status": "ok",
+        "timestamp": datetime.now().isoformat()
+    })
 
 if __name__ == '__main__':
     with app.app_context():
