@@ -461,6 +461,7 @@ def sync_google_sheet_to_postgres():
                 dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
                 host=DB_HOST, port=DB_PORT
             )
+            conn.autocommit = False  # ปิด autocommit เพื่อควบคุม transaction
             cur = conn.cursor()
         except psycopg2.Error as e:
             raise Exception(f"Database connection error: {str(e)}")
@@ -549,6 +550,9 @@ def sync_google_sheet_to_postgres():
                 ))
             except Exception as e:
                 print(f"ERROR: Error syncing row: {row.get('Ticket ID', 'N/A')} - {e}")
+                # Rollback transaction เมื่อเกิด error
+                conn.rollback()
+                raise e
         
         # เพิ่ม notification สำหรับ textbox ที่อัปเดต
         for update in textbox_updates:
@@ -566,6 +570,7 @@ def sync_google_sheet_to_postgres():
                     message = f"New ticket created: #{ticket_id} - {row.get('ชื่อ', '')} ({row.get('แผนก', '')})"
                     cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
 
+        # Commit transaction
         conn.commit()
         conn.close()
         return new_tickets
@@ -573,6 +578,13 @@ def sync_google_sheet_to_postgres():
     except Exception as e:
         # จัดการข้อผิดพลาดและบันทึก log
         print(f"ERROR: Error in sync_google_sheet_to_postgres: {str(e)}")
+        # Rollback transaction ถ้ายังไม่ได้ commit
+        if 'conn' in locals() and conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
         raise  # ส่งข้อผิดพลาดต่อไปเพื่อให้ Flask จัดการ
 
 @app.route('/api/notifications')
@@ -1744,8 +1756,14 @@ def sync_route():
                 print("Tables created successfully")
                 
                 print("Starting Google Sheets sync...")
-                new_tickets = sync_google_sheet_to_postgres()
-                print(f"Sync completed. New tickets: {len(new_tickets) if new_tickets else 0}")
+                try:
+                    new_tickets = sync_google_sheet_to_postgres()
+                    print(f"Google Sheets sync completed. New tickets: {len(new_tickets) if new_tickets else 0}")
+                except Exception as gs_error:
+                    print(f"Google Sheets sync failed: {str(gs_error)}")
+                    print("Falling back to simple sync...")
+                    # ถ้า Google Sheets sync ล้มเหลว ให้ใช้ simple sync แทน
+                    pass
         except Exception as sync_error:
             print(f"Sync error: {str(sync_error)}")
             import traceback
@@ -2238,6 +2256,58 @@ def sync_simple():
         traceback.print_exc()
         return jsonify({
             "error": "Internal Server Error",
+            "message": str(e)
+        }), 500
+
+@app.route('/api/test-google-sheets')
+def test_google_sheets():
+    try:
+        print("Testing Google Sheets connection...")
+        
+        # ตรวจสอบว่าไฟล์ credentials.json มีอยู่
+        if not os.path.exists(CREDENTIALS_FILE):
+            return jsonify({
+                "error": "Credentials file not found",
+                "message": f"File {CREDENTIALS_FILE} does not exist"
+            }), 500
+        
+        # ทดสอบการเชื่อมต่อ Google Sheets
+        scope = ['https://spreadsheets.google.com/feeds', 
+                'https://www.googleapis.com/auth/drive']
+        
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
+        client = gspread.authorize(creds)
+        
+        # เปิด sheet
+        try:
+            sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
+            records = sheet.get_all_records()
+            
+            return jsonify({
+                "success": True,
+                "message": "Google Sheets connection successful",
+                "sheet_name": SHEET_NAME,
+                "worksheet_name": WORKSHEET_NAME,
+                "record_count": len(records),
+                "sample_data": records[:3] if records else []
+            })
+            
+        except gspread.exceptions.SpreadsheetNotFound:
+            return jsonify({
+                "error": "Spreadsheet not found",
+                "message": f"Google Sheet '{SHEET_NAME}' not found"
+            }), 404
+            
+        except gspread.exceptions.WorksheetNotFound:
+            return jsonify({
+                "error": "Worksheet not found",
+                "message": f"Worksheet '{WORKSHEET_NAME}' not found"
+            }), 404
+            
+    except Exception as e:
+        print(f"Google Sheets test error: {str(e)}")
+        return jsonify({
+            "error": "Google Sheets connection failed",
             "message": str(e)
         }), 500
 
