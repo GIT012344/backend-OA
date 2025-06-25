@@ -1719,43 +1719,109 @@ def mark_messages_read():
 @app.route('/sync-tickets')
 def sync_route():
     try:
-        with app.app_context():
-            create_tickets_table()
-            new_tickets = sync_google_sheet_to_postgres()
+        print("Starting sync process...")
         
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-            host=DB_HOST, port=DB_PORT
-        )
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT ticket_id, email, name, phone, department, created_at, 
-                   status, appointment, requested, report, type, textbox 
-            FROM tickets;
-        """)
-        rows = cur.fetchall()
-        conn.close()
+        # ตรวจสอบการเชื่อมต่อฐานข้อมูล
+        try:
+            conn = psycopg2.connect(
+                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
+                host=DB_HOST, port=DB_PORT
+            )
+            print("Database connection successful")
+            conn.close()
+        except Exception as db_error:
+            print(f"Database connection failed: {str(db_error)}")
+            return jsonify({
+                "error": "Database connection failed",
+                "message": str(db_error)
+            }), 500
         
-        result = [
-            {
-                "Ticket ID": row[0],
-                "อีเมล": row[1],
-                "ชื่อ": row[2],
-                "เบอร์ติดต่อ": row[3],
-                "แผนก": row[4],
-                "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
-                "สถานะ": row[6],
-                "Appointment": row[7],
-                "Requeste": row[8],
-                "Report": row[9],
-                "Type": row[10],
-                "TEXTBOX": row[11]
-            }
-            for row in rows
-        ]
-        return jsonify(result)
+        # สร้างตารางและ sync ข้อมูล
+        try:
+            with app.app_context():
+                print("Creating tables...")
+                create_tickets_table()
+                print("Tables created successfully")
+                
+                print("Starting Google Sheets sync...")
+                new_tickets = sync_google_sheet_to_postgres()
+                print(f"Sync completed. New tickets: {len(new_tickets) if new_tickets else 0}")
+        except Exception as sync_error:
+            print(f"Sync error: {str(sync_error)}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                "error": "Sync failed",
+                "message": str(sync_error)
+            }), 500
+        
+        # ดึงข้อมูลจากฐานข้อมูล
+        try:
+            conn = psycopg2.connect(
+                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
+                host=DB_HOST, port=DB_PORT
+            )
+            cur = conn.cursor()
+            
+            # ตรวจสอบว่าตาราง tickets มีอยู่หรือไม่
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'tickets'
+                );
+            """)
+            result = cur.fetchone()
+            table_exists = result[0] if result else False
+            
+            if not table_exists:
+                print("Tickets table does not exist")
+                return jsonify({
+                    "error": "Tickets table not found",
+                    "message": "Please run init-users first"
+                }), 500
+            
+            cur.execute("""
+                SELECT ticket_id, email, name, phone, department, created_at, 
+                       status, appointment, requested, report, type, textbox 
+                FROM tickets
+                ORDER BY created_at DESC;
+            """)
+            rows = cur.fetchall()
+            print(f"Retrieved {len(rows)} tickets from database")
+            conn.close()
+            
+            result = [
+                {
+                    "Ticket ID": row[0],
+                    "อีเมล": row[1],
+                    "ชื่อ": row[2],
+                    "เบอร์ติดต่อ": row[3],
+                    "แผนก": row[4],
+                    "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
+                    "สถานะ": row[6],
+                    "Appointment": row[7],
+                    "Requeste": row[8],
+                    "Report": row[9],
+                    "Type": row[10],
+                    "TEXTBOX": row[11]
+                }
+                for row in rows
+            ]
+            
+            print("Sync process completed successfully")
+            return jsonify(result)
+            
+        except Exception as query_error:
+            print(f"Query error: {str(query_error)}")
+            return jsonify({
+                "error": "Database query failed",
+                "message": str(query_error)
+            }), 500
         
     except Exception as e:
+        print(f"Unexpected error in sync_route: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "error": "Internal Server Error",
             "message": str(e),
@@ -2079,6 +2145,101 @@ def test_api():
         "status": "ok",
         "timestamp": datetime.now().isoformat()
     })
+
+@app.route('/api/sync-simple')
+def sync_simple():
+    try:
+        print("Starting simple sync process...")
+        
+        # สร้างตาราง
+        try:
+            with app.app_context():
+                print("Creating tables...")
+                create_tickets_table()
+                print("Tables created successfully")
+        except Exception as table_error:
+            print(f"Table creation error: {str(table_error)}")
+            return jsonify({
+                "error": "Table creation failed",
+                "message": str(table_error)
+            }), 500
+        
+        # ดึงข้อมูลจากฐานข้อมูล
+        try:
+            conn = psycopg2.connect(
+                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
+                host=DB_HOST, port=DB_PORT
+            )
+            cur = conn.cursor()
+            
+            # ตรวจสอบว่าตาราง tickets มีอยู่หรือไม่
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'tickets'
+                );
+            """)
+            result = cur.fetchone()
+            table_exists = result[0] if result else False
+            
+            if not table_exists:
+                print("Tickets table does not exist")
+                return jsonify({
+                    "error": "Tickets table not found",
+                    "message": "Table creation failed"
+                }), 500
+            
+            cur.execute("""
+                SELECT ticket_id, email, name, phone, department, created_at, 
+                       status, appointment, requested, report, type, textbox 
+                FROM tickets
+                ORDER BY created_at DESC;
+            """)
+            rows = cur.fetchall()
+            print(f"Retrieved {len(rows)} tickets from database")
+            conn.close()
+            
+            result = [
+                {
+                    "Ticket ID": row[0],
+                    "อีเมล": row[1],
+                    "ชื่อ": row[2],
+                    "เบอร์ติดต่อ": row[3],
+                    "แผนก": row[4],
+                    "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
+                    "สถานะ": row[6],
+                    "Appointment": row[7],
+                    "Requeste": row[8],
+                    "Report": row[9],
+                    "Type": row[10],
+                    "TEXTBOX": row[11]
+                }
+                for row in rows
+            ]
+            
+            print("Simple sync process completed successfully")
+            return jsonify({
+                "success": True,
+                "message": "Tables created and data retrieved successfully",
+                "ticket_count": len(rows),
+                "data": result
+            })
+            
+        except Exception as query_error:
+            print(f"Query error: {str(query_error)}")
+            return jsonify({
+                "error": "Database query failed",
+                "message": str(query_error)
+            }), 500
+        
+    except Exception as e:
+        print(f"Unexpected error in sync_simple: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "error": "Internal Server Error",
+            "message": str(e)
+        }), 500
 
 if __name__ == '__main__':
     with app.app_context():
