@@ -25,7 +25,8 @@ app.config['JWT_SECRET_KEY'] = 'your-secret-key-here'  # ควรเปลี�
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)  # Token หมดอายุใน 1 ชั่วโมง
 jwt = JWTManager(app)
 
-CORS(app)
+# แก้ไข CORS ให้รองรับทุก origin
+CORS(app, origins=["*"], supports_credentials=True)
 
 DB_NAME = 'datagit'
 DB_USER = 'git'
@@ -670,34 +671,48 @@ def create_tables():
 # เพิ่ม route สำหรับ login
 @app.route('/api/login', methods=['POST'])
 def login():
-    if not request.is_json:
-        return jsonify({"msg": "Missing JSON in request"}), 400
+    try:
+        if not request.is_json:
+            return jsonify({"msg": "Missing JSON in request"}), 400
 
-    data = request.get_json()
-    if not data:
-        return jsonify({"msg": "Missing JSON data"}), 400
+        data = request.get_json()
+        if not data:
+            return jsonify({"msg": "Missing JSON data"}), 400
 
-    pin = data.get('pin', None)
+        pin = data.get('pin', None)
 
-    if not pin:
-        return jsonify({"msg": "Missing PIN"}), 400
+        if not pin:
+            return jsonify({"msg": "Missing PIN"}), 400
 
-    user = User.query.filter_by(pin=pin).first()
-    if not user or not user.check_pin(pin):
-        return jsonify({"msg": "Invalid PIN"}), 401
+        # Debug: print received data
+        print(f"Login attempt with PIN: {pin}")
 
-    access_token = create_access_token(identity={
-        'pin': user.pin,
-        'role': user.role,
-        'name': user.name
-    })
-    return jsonify({
-        "access_token": access_token,
-        "user": {
-            "name": user.name,
-            "role": user.role
-        }
-    }), 200
+        user = User.query.filter_by(pin=pin).first()
+        if not user:
+            return jsonify({"msg": "Invalid PIN - User not found"}), 401
+        
+        if not user.check_pin(pin):
+            return jsonify({"msg": "Invalid PIN - User inactive or PIN mismatch"}), 401
+
+        access_token = create_access_token(identity={
+            'pin': user.pin,
+            'role': user.role,
+            'name': user.name
+        })
+        
+        print(f"Login successful for user: {user.name} (PIN: {user.pin})")
+        
+        return jsonify({
+            "access_token": access_token,
+            "user": {
+                "name": user.name,
+                "role": user.role
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        return jsonify({"msg": "Internal server error", "error": str(e)}), 500
 
 # เพิ่ม route สำหรับตรวจสอบ token
 @app.route('/api/protected', methods=['GET'])
@@ -711,7 +726,6 @@ def protected():
 
 
 @app.route('/api/data')
-@jwt_required()
 @cache.cached(timeout=60) 
 def get_data():
     try:
@@ -770,7 +784,8 @@ def update_status():
             ticket.status = new_status
             
             # Create notification
-            notification = Notification(message=f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}")
+            notification = Notification()
+            notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
             db.session.add(notification)
             
             db.session.commit()
@@ -842,7 +857,8 @@ def delete_ticket():
         db.session.delete(ticket)
         
         # 3. สร้าง notification
-        notification = Notification(message=f"Ticket {ticket_id} has been deleted")
+        notification = Notification()
+        notification.message = f"Ticket {ticket_id} has been deleted"
         db.session.add(notification)
         
         db.session.commit()
@@ -1598,8 +1614,9 @@ def mark_messages_read():
 @app.route('/sync-tickets')
 def sync_route():
     try:
-        create_tickets_table()
-        new_tickets = sync_google_sheet_to_postgres()
+        with app.app_context():
+            create_tickets_table()
+            new_tickets = sync_google_sheet_to_postgres()
         
         conn = psycopg2.connect(
             dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
@@ -1744,6 +1761,34 @@ def delete_user(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/status')
+def system_status():
+    try:
+        # ตรวจสอบการเชื่อมต่อฐานข้อมูล
+        conn = psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
+            host=DB_HOST, port=DB_PORT
+        )
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM tickets")
+        result = cur.fetchone()
+        ticket_count = result[0] if result else 0
+        conn.close()
+        
+        return jsonify({
+            "status": "healthy",
+            "database": "connected",
+            "ticket_count": ticket_count,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
 
 if __name__ == '__main__':
     with app.app_context():
