@@ -637,25 +637,34 @@ class User(db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    pin = db.Column(db.String(10), unique=True, nullable=False)  # รหัส PIN
     role = db.Column(db.String(20), default='user')  # 'user' หรือ 'admin'
+    name = db.Column(db.String(100), nullable=False)  # ชื่อผู้ใช้
+    is_active = db.Column(db.Boolean, default=True)  # สถานะการใช้งาน
 
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+    def check_pin(self, pin):
+        return self.pin == pin and self.is_active
 
 # สร้างตาราง users
 def create_tables():
     db.create_all()
     
-    # สร้างผู้ใช้ admin เริ่มต้นถ้ายังไม่มี
-    if not User.query.filter_by(username='admin').first():
-        admin = User(username='admin', role='admin')
-        admin.set_password('admin123')  # เปลี่ยนรหัสผ่านนี้ใน production!
+    # สร้างผู้ใช้เริ่มต้นถ้ายังไม่มี
+    if not User.query.filter_by(pin='1234').first():
+        admin = User()
+        admin.pin = '1234'
+        admin.role = 'admin'
+        admin.name = 'ผู้ดูแลระบบ'
         db.session.add(admin)
+        db.session.commit()
+    
+    # สร้างผู้ใช้ทั่วไป
+    if not User.query.filter_by(pin='0000').first():
+        user = User()
+        user.pin = '0000'
+        user.role = 'user'
+        user.name = 'ผู้ใช้ทั่วไป'
+        db.session.add(user)
         db.session.commit()
 
 # เพิ่ม route สำหรับ login
@@ -664,21 +673,31 @@ def login():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
 
-    username = request.json.get('username', None)
-    password = request.json.get('password', None)
+    data = request.get_json()
+    if not data:
+        return jsonify({"msg": "Missing JSON data"}), 400
 
-    if not username or not password:
-        return jsonify({"msg": "Missing username or password"}), 400
+    pin = data.get('pin', None)
 
-    user = User.query.filter_by(username=username).first()
-    if not user or not user.check_password(password):
-        return jsonify({"msg": "Bad username or password"}), 401
+    if not pin:
+        return jsonify({"msg": "Missing PIN"}), 400
+
+    user = User.query.filter_by(pin=pin).first()
+    if not user or not user.check_pin(pin):
+        return jsonify({"msg": "Invalid PIN"}), 401
 
     access_token = create_access_token(identity={
-        'username': user.username,
-        'role': user.role
+        'pin': user.pin,
+        'role': user.role,
+        'name': user.name
     })
-    return jsonify(access_token=access_token), 200
+    return jsonify({
+        "access_token": access_token,
+        "user": {
+            "name": user.name,
+            "role": user.role
+        }
+    }), 200
 
 # เพิ่ม route สำหรับตรวจสอบ token
 @app.route('/api/protected', methods=['GET'])
@@ -847,11 +866,6 @@ def delete_ticket():
                     "success": True,
                     "message": "Ticket deleted from database but not found in Google Sheets"
                 }), 200
-        except gspread.exceptions.CellNotFound:
-            return jsonify({
-                "success": True,
-                "message": "Ticket deleted from database but not found in Google Sheets"
-            }), 200
         except Exception as e:
             print(f"Google Sheets deletion error: {str(e)}")
             return jsonify({
@@ -927,10 +941,6 @@ def auto_clear_textbox():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-@app.route('/health')
-def health_check():
-    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
-
 @app.route('/clear-textboxes', methods=['POST'])
 def clear_textboxes():
     try:
@@ -960,7 +970,7 @@ def clear_textboxes():
                     cell = sheet.find(ticket.ticket_id)
                     if cell:
                         sheet.update_cell(cell.row, textbox_col, '')
-                except gspread.exceptions.CellNotFound:
+                except Exception:
                     continue
 
         return jsonify({
@@ -1030,7 +1040,7 @@ def update_textbox():
     if request.content_type != 'application/json':
         return jsonify({"error": "Content-Type must be application/json"}), 415
 
-    data = request.json
+    data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
         
@@ -1090,7 +1100,7 @@ def update_textbox():
                 sheet.update_cell(cell.row, textbox_col, new_text)
             return jsonify({"message": "✅ Updated textbox in PostgreSQL and Google Sheets"})
         return jsonify({"error": "Ticket ID not found in sheet"}), 404
-    except gspread.CellNotFound:
+    except Exception:
         return jsonify({"error": "Ticket ID not found in sheet"}), 404
 
 @app.route('/api/email-rankings')
@@ -1127,7 +1137,10 @@ def get_email_rankings():
 
 @app.route('/send-announcement', methods=['POST'])
 def send_announcement():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
     announcement_message = data.get('message')
 
     if not announcement_message:
@@ -1183,7 +1196,7 @@ def send_announcement():
                     cell = sheet.find(ticket_id)
                     if cell:
                         sheet.update_cell(cell.row, textbox_col, full_message)
-                except gspread.exceptions.CellNotFound:
+                except Exception:
                     continue
 
         # 4. สร้าง notification ในระบบ
@@ -1297,7 +1310,10 @@ def send_announcement_message(user_id, message, recipient_name=None):
 
 @app.route('/delete-notification', methods=['POST'])
 def delete_notification():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
     notification_id = data.get('id')
     
     if not notification_id:
@@ -1313,10 +1329,67 @@ def delete_notification():
     
     return jsonify({"success": True})
 
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
+
+@app.route('/update-ticket', methods=['POST', 'OPTIONS'])
+def update_ticket():
+    if request.method == 'OPTIONS':
+        return '', 200  # สำหรับ CORS preflight
+
+    if request.content_type != 'application/json':
+        return jsonify({"error": "Content-Type must be application/json"}), 415
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
+    ticket_id = data.get("ticket_id")
+    new_status = data.get("status")
+    new_textbox = data.get("textbox")
+
+    if not ticket_id:
+        return jsonify({"error": "ticket_id is required"}), 400
+
+    # --- 1. อัปเดต PostgreSQL ---
+    conn = psycopg2.connect(
+        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
+    )
+    cur = conn.cursor()
+    if new_status is not None:
+        cur.execute("UPDATE tickets SET status = %s WHERE ticket_id = %s;", (new_status, ticket_id))
+    if new_textbox is not None:
+        cur.execute("UPDATE tickets SET textbox = %s WHERE ticket_id = %s;", (new_textbox, ticket_id))
+    conn.commit()
+    conn.close()
+
+    # --- 2. อัปเดต Google Sheets ---
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
+    client = gspread.authorize(creds)
+    sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
+
+    try:
+        cell = sheet.find(ticket_id)
+        if cell:
+            headers = sheet.row_values(1)
+            if new_status is not None and "สถานะ" in headers:
+                status_col = headers.index("สถานะ") + 1
+                sheet.update_cell(cell.row, status_col, new_status)
+            if new_textbox is not None and "TEXTBOX" in headers:
+                textbox_col = headers.index("TEXTBOX") + 1
+                sheet.update_cell(cell.row, textbox_col, new_textbox)
+        else:
+            return jsonify({"error": "Ticket ID not found in sheet"}), 404
+    except Exception:
+        return jsonify({"error": "Ticket ID not found in sheet"}), 404
+
+    return jsonify({"message": "✅ Ticket updated in PostgreSQL and Google Sheets"})
+
 @app.route('/api/data-by-date', methods=['GET'])
 def get_data_by_date():
     date_str = request.args.get('date')
-    
     
     if not date_str:
         return jsonify({"error": "Date parameter is required"}), 400
@@ -1373,55 +1446,7 @@ def get_data_by_date():
         return jsonify({"error": str(e)}), 500
     finally:
         if 'conn' in locals():
-            conn.close()  
-
-@app.route('/update-ticket', methods=['POST', 'OPTIONS'])
-def update_ticket():
-    if request.method == 'OPTIONS':
-        return '', 200  # สำหรับ CORS preflight
-
-    if request.content_type != 'application/json':
-        return jsonify({"error": "Content-Type must be application/json"}), 415
-
-    data = request.json
-    ticket_id = data.get("ticket_id")
-    new_status = data.get("status")
-    new_textbox = data.get("textbox")
-
-    if not ticket_id:
-        return jsonify({"error": "ticket_id is required"}), 400
-
-    # --- 1. อัปเดต PostgreSQL ---
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    if new_status is not None:
-        cur.execute("UPDATE tickets SET status = %s WHERE ticket_id = %s;", (new_status, ticket_id))
-    if new_textbox is not None:
-        cur.execute("UPDATE tickets SET textbox = %s WHERE ticket_id = %s;", (new_textbox, ticket_id))
-    conn.commit()
-    conn.close()
-
-    # --- 2. อัปเดต Google Sheets ---
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-    client = gspread.authorize(creds)
-    sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
-    try:
-        cell = sheet.find(ticket_id)
-        headers = sheet.row_values(1)
-        if new_status is not None and "สถานะ" in headers:
-            status_col = headers.index("สถานะ") + 1
-            sheet.update_cell(cell.row, status_col, new_status)
-        if new_textbox is not None and "TEXTBOX" in headers:
-            textbox_col = headers.index("TEXTBOX") + 1
-            sheet.update_cell(cell.row, textbox_col, new_textbox)
-    except gspread.exceptions.CellNotFound:
-        return jsonify({"error": "Ticket ID not found in sheet"}), 404
-
-    return jsonify({"message": "✅ Ticket updated in PostgreSQL and Google Sheets"})
+            conn.close()
 
 @app.route('/api/messages', methods=['GET'])
 def get_messages():
@@ -1460,7 +1485,10 @@ def get_messages():
 
 @app.route('/api/messages', methods=['POST'])
 def add_message():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
     sender_name = data.get('sender_name')
@@ -1485,35 +1513,39 @@ def add_message():
         
         new_message = cur.fetchone()
         
-        # อัปเดต TEXTBOX ในตาราง tickets เป็นค่าว่างทันที
-        cur.execute("""
-            UPDATE tickets 
-            SET textbox = '' 
-            WHERE ticket_id = %s
-        """, (ticket_id,))
-        
-        conn.commit()
-        
-        # อัปเดต Google Sheets ให้ textbox เป็นค่าว่าง
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-        client = gspread.authorize(creds)
-        sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
+        if new_message:
+            # อัปเดต TEXTBOX ในตาราง tickets เป็นค่าว่างทันที
+            cur.execute("""
+                UPDATE tickets 
+                SET textbox = '' 
+                WHERE ticket_id = %s
+            """, (ticket_id,))
+            
+            conn.commit()
+            
+            # อัปเดต Google Sheets ให้ textbox เป็นค่าว่าง
+            scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+            creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
+            client = gspread.authorize(creds)
+            sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
-        try:
-            cell = sheet.find(ticket_id)
-            headers = sheet.row_values(1)
-            if "TEXTBOX" in headers:
-                textbox_col = headers.index("TEXTBOX") + 1
-                sheet.update_cell(cell.row, textbox_col, '')
-        except gspread.exceptions.CellNotFound:
-            pass  # ไม่ต้องทำอะไรถ้าไม่พบ ticket ใน sheet
-        
-        return jsonify({
-            "id": new_message[0],
-            "timestamp": new_message[1].isoformat(),
-            "success": True
-        })
+            try:
+                cell = sheet.find(ticket_id)
+                if cell:
+                    headers = sheet.row_values(1)
+                    if "TEXTBOX" in headers:
+                        textbox_col = headers.index("TEXTBOX") + 1
+                        sheet.update_cell(cell.row, textbox_col, '')
+            except Exception:
+                pass  # ไม่ต้องทำอะไรถ้าไม่พบ ticket ใน sheet
+            
+            return jsonify({
+                "id": new_message[0],
+                "timestamp": new_message[1].isoformat(),
+                "success": True
+            })
+        else:
+            return jsonify({"error": "Failed to create message"}), 500
         
     except Exception as e:
         conn.rollback()
@@ -1524,7 +1556,10 @@ def add_message():
 
 @app.route('/api/messages/mark-read', methods=['POST'])
 def mark_messages_read():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
 
@@ -1604,6 +1639,111 @@ def sync_route():
             "message": str(e),
             "status": 500
         }), 500
+
+@app.route('/api/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    try:
+        users = User.query.all()
+        result = []
+        for user in users:
+            result.append({
+                "id": user.id,
+                "pin": user.pin,
+                "name": user.name,
+                "role": user.role,
+                "is_active": user.is_active
+            })
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/users', methods=['POST'])
+@jwt_required()
+def create_user():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
+    pin = data.get('pin')
+    name = data.get('name')
+    role = data.get('role', 'user')
+    
+    if not pin or not name:
+        return jsonify({"error": "PIN and name are required"}), 400
+    
+    # ตรวจสอบว่า PIN ซ้ำหรือไม่
+    if User.query.filter_by(pin=pin).first():
+        return jsonify({"error": "PIN already exists"}), 400
+    
+    try:
+        user = User()
+        user.pin = pin
+        user.role = role
+        user.name = name
+        db.session.add(user)
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "user": {
+                "id": user.id,
+                "pin": user.pin,
+                "name": user.name,
+                "role": user.role
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+@jwt_required()
+def update_user(user_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    try:
+        if 'name' in data:
+            user.name = data['name']
+        if 'role' in data:
+            user.role = data['role']
+        if 'is_active' in data:
+            user.is_active = data['is_active']
+        
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "user": {
+                "id": user.id,
+                "pin": user.pin,
+                "name": user.name,
+                "role": user.role,
+                "is_active": user.is_active
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@jwt_required()
+def delete_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"success": True, "message": "User deleted successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():
