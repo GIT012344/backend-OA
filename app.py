@@ -651,18 +651,18 @@ def create_tables():
     db.create_all()
     
     # สร้างผู้ใช้เริ่มต้นถ้ายังไม่มี
-    if not User.query.filter_by(pin='1234').first():
+    if not User.query.filter_by(pin='123456').first():
         admin = User()
-        admin.pin = '1234'
+        admin.pin = '123456'
         admin.role = 'admin'
         admin.name = 'ผู้ดูแลระบบ'
         db.session.add(admin)
         db.session.commit()
     
     # สร้างผู้ใช้ทั่วไป
-    if not User.query.filter_by(pin='0000').first():
+    if not User.query.filter_by(pin='000000').first():
         user = User()
-        user.pin = '0000'
+        user.pin = '000000'
         user.role = 'user'
         user.name = 'ผู้ใช้ทั่วไป'
         db.session.add(user)
@@ -672,59 +672,83 @@ def create_tables():
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
-        print(f"Login request received - Content-Type: {request.content_type}")
-        print(f"Request headers: {dict(request.headers)}")
+        print("=" * 50)
+        print("LOGIN REQUEST RECEIVED")
+        print("=" * 50)
+        print(f"Method: {request.method}")
+        print(f"URL: {request.url}")
+        print(f"Content-Type: {request.content_type}")
+        print(f"Content-Length: {request.content_length}")
+        print(f"Headers: {dict(request.headers)}")
         
         # ตรวจสอบ Content-Type
         if request.content_type and 'application/json' not in request.content_type:
-            print(f"Invalid content type: {request.content_type}")
+            print(f"❌ Invalid content type: {request.content_type}")
             return jsonify({"msg": "Content-Type must be application/json"}), 400
 
         # ตรวจสอบว่าเป็น JSON หรือไม่
         if not request.is_json:
-            print("Request is not JSON")
+            print("❌ Request is not JSON")
             # ลองอ่าน raw data
             raw_data = request.get_data(as_text=True)
             print(f"Raw data: {raw_data}")
             return jsonify({"msg": "Missing JSON in request"}), 400
 
         data = request.get_json()
-        print(f"Received data: {data}")
+        print(f"✅ Received JSON data: {data}")
+        print(f"Data type: {type(data)}")
         
         if not data:
+            print("❌ No data received")
             return jsonify({"msg": "Missing JSON data"}), 400
 
         # รองรับหลายรูปแบบของ PIN
         pin = None
+        print(f"Checking for pin in data keys: {list(data.keys())}")
+        
         if 'pin' in data:
             pin = data['pin']
+            print(f"Found 'pin' field: {pin}")
         elif 'username' in data:
-            pin = data['username']  # รองรับ username field
+            pin = data['username']
+            print(f"Found 'username' field: {pin}")
         elif 'password' in data:
-            pin = data['password']  # รองรับ password field
+            pin = data['password']
+            print(f"Found 'password' field: {pin}")
+        elif 'email' in data:
+            pin = data['email']
+            print(f"Found 'email' field: {pin}")
+        else:
+            print(f"❌ No valid field found. Available fields: {list(data.keys())}")
+            return jsonify({"msg": "Missing PIN/username/password/email field"}), 400
 
         if not pin:
+            print("❌ PIN is empty or None")
             return jsonify({"msg": "Missing PIN/username/password"}), 400
 
         # แปลง PIN เป็น string
         pin = str(pin).strip()
-        
-        print(f"Login attempt with PIN: '{pin}'")
+        print(f"🔐 Login attempt with PIN: '{pin}' (length: {len(pin)})")
 
         # ตรวจสอบว่ามีตาราง users หรือไม่
         try:
             user = User.query.filter_by(pin=pin).first()
-            print(f"User found: {user}")
+            print(f"👤 User found: {user}")
+            if user:
+                print(f"   - ID: {user.id}")
+                print(f"   - Name: {user.name}")
+                print(f"   - Role: {user.role}")
+                print(f"   - Active: {user.is_active}")
         except Exception as db_error:
-            print(f"Database error: {db_error}")
+            print(f"❌ Database error: {db_error}")
             return jsonify({"msg": "Database connection error"}), 500
 
         if not user:
-            print(f"No user found with PIN: {pin}")
+            print(f"❌ No user found with PIN: {pin}")
             return jsonify({"msg": "Invalid PIN - User not found"}), 401
         
         if not user.check_pin(pin):
-            print(f"PIN check failed for user: {user.name}")
+            print(f"❌ PIN check failed for user: {user.name}")
             return jsonify({"msg": "Invalid PIN - User inactive or PIN mismatch"}), 401
 
         access_token = create_access_token(identity={
@@ -733,7 +757,8 @@ def login():
             'name': user.name
         })
         
-        print(f"Login successful for user: {user.name} (PIN: {user.pin})")
+        print(f"✅ Login successful for user: {user.name} (PIN: {user.pin})")
+        print("=" * 50)
         
         return jsonify({
             "access_token": access_token,
@@ -744,7 +769,7 @@ def login():
         }), 200
         
     except Exception as e:
-        print(f"Login error: {str(e)}")
+        print(f"❌ Login error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"msg": "Internal server error", "error": str(e)}), 500
@@ -1833,21 +1858,21 @@ def init_users():
             db.create_all()
             
             # สร้างผู้ใช้เริ่มต้นถ้ายังไม่มี
-            if not User.query.filter_by(pin='1234').first():
+            if not User.query.filter_by(pin='123456').first():
                 admin = User()
-                admin.pin = '1234'
+                admin.pin = '123456'
                 admin.role = 'admin'
                 admin.name = 'ผู้ดูแลระบบ'
                 db.session.add(admin)
-                print("Created admin user with PIN: 1234")
+                print("Created admin user with PIN: 123456")
             
-            if not User.query.filter_by(pin='0000').first():
+            if not User.query.filter_by(pin='000000').first():
                 user = User()
-                user.pin = '0000'
+                user.pin = '000000'
                 user.role = 'user'
                 user.name = 'ผู้ใช้ทั่วไป'
                 db.session.add(user)
-                print("Created regular user with PIN: 0000")
+                print("Created regular user with PIN: 000000")
             
             db.session.commit()
             
@@ -1938,6 +1963,59 @@ def test_database():
         return jsonify({
             "success": False,
             "database_connected": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/reset-users')
+def reset_users():
+    try:
+        with app.app_context():
+            # ลบผู้ใช้เก่าทั้งหมด
+            User.query.delete()
+            db.session.commit()
+            print("Deleted all existing users")
+            
+            # สร้างผู้ใช้ใหม่
+            admin = User()
+            admin.pin = '123456'
+            admin.role = 'admin'
+            admin.name = 'ผู้ดูแลระบบ'
+            db.session.add(admin)
+            print("Created admin user with PIN: 123456")
+            
+            user = User()
+            user.pin = '000000'
+            user.role = 'user'
+            user.name = 'ผู้ใช้ทั่วไป'
+            db.session.add(user)
+            print("Created regular user with PIN: 000000")
+            
+            db.session.commit()
+            
+            # ดึงรายชื่อผู้ใช้ทั้งหมด
+            users = User.query.all()
+            user_list = []
+            for user in users:
+                user_list.append({
+                    "id": user.id,
+                    "pin": user.pin,
+                    "name": user.name,
+                    "role": user.role,
+                    "is_active": user.is_active
+                })
+            
+            return jsonify({
+                "success": True,
+                "message": "Users reset successfully",
+                "users": user_list
+            })
+            
+    except Exception as e:
+        print(f"Error resetting users: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
             "error": str(e)
         }), 500
 
