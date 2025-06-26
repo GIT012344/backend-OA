@@ -16,7 +16,7 @@ from flask_jwt_extended import (
 from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
 
-LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
+LINE_ACCESS_TOKEN = "0C9ZwOVQ7BOY9dLLfvEqAP+RhpIXmlpcuHf4fgJ184c0nvKzc5S+rKAyjh7yDqadGK1VNxe36n+nswrYaDSLCKOGmhuXjrsRgspH1RF4hGWdgOrrMlBhGnYQjxB9jHDSXVHO5HYkjLJdWOarG8PXKQdB04t89/1O/w1cDnyilFU="
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
@@ -888,7 +888,7 @@ def update_status():
         return jsonify({"error": "ticket_id and status required"}), 400
 
     try:
-        # 1. Update PostgreSQL using SQLAlchemy
+        # Update PostgreSQL using SQLAlchemy
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
@@ -907,43 +907,26 @@ def update_status():
             
             db.session.commit()
             
-            # 2. Update Google Sheets
-            scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-            creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-            client = gspread.authorize(creds)
-            sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
-            cell = sheet.find(ticket_id)
-            if cell:
-                headers = sheet.row_values(1)
-                if "สถานะ" in headers:
-                    status_col = headers.index("สถานะ") + 1
-                    sheet.update_cell(cell.row, status_col, new_status)
+            # Send LINE notification if user_id exists
+            if ticket.user_id:
+                payload = {
+                    'ticket_id': ticket.ticket_id,
+                    'user_id': ticket.user_id,
+                    'status': new_status,
+                    'email': ticket.email,
+                    'name': ticket.name,
+                    'phone': ticket.phone,
+                    'department': ticket.department,
+                    'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
+                    'appointment': ticket.appointment,
+                    'requested': ticket.requested,
+                    'report': ticket.report,
+                    'type': ticket.type,
+                    'textbox': ticket.textbox,
+                }
+                notify_user(payload)
                     
-                    # Prepare payload for LINE notification
-                    row_data = sheet.row_values(cell.row)
-                    ticket_data = dict(zip(headers, row_data))
-                    
-                    payload = {
-                        'ticket_id': ticket_data.get('Ticket ID'),
-                        'user_id': ticket_data.get('User ID'),
-                        'status': new_status,
-                        'email': ticket_data.get('อีเมล'),
-                        'name': ticket_data.get('ชื่อ'),
-                        'phone': ticket_data.get('เบอร์ติดต่อ'),
-                        'department': ticket_data.get('แผนก'),
-                        'created_at': ticket_data.get('วันที่แจ้ง'),
-                        'appointment': ticket_data.get('Appointment'),
-                        'requested': ticket_data.get('Requeste'),
-                        'report': ticket_data.get('Report'),
-                        'type': ticket_data.get('Type'),
-                        'textbox': ticket_data.get('TEXTBOX'),
-                    }
-
-                    notify_user(payload)
-                    
-                return jsonify({"message": "Updated both PostgreSQL and Google Sheets"})
-            return jsonify({"error": "Ticket ID not found in sheet"}), 404
+            return jsonify({"message": "Status updated in PostgreSQL"})
         else:
             return jsonify({"message": "Status unchanged"})
             
@@ -980,31 +963,10 @@ def delete_ticket():
         
         db.session.commit()
 
-        # 4. ลบจาก Google Sheets
-        try:
-            scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-            creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-            client = gspread.authorize(creds)
-            sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
-            cell = sheet.find(ticket_id)
-            if cell:
-                sheet.delete_rows(cell.row)
-                return jsonify({
-                    "success": True, 
-                    "message": "Ticket deleted from both PostgreSQL and Google Sheets"
-                })
-            else:
-                return jsonify({
-                    "success": True,
-                    "message": "Ticket deleted from database but not found in Google Sheets"
-                }), 200
-        except Exception as e:
-            print(f"Google Sheets deletion error: {str(e)}")
-            return jsonify({
-                "success": True,
-                "message": f"Ticket deleted from database but Google Sheets error: {str(e)}"
-            }), 200
+        return jsonify({
+            "success": True, 
+            "message": "Ticket deleted from PostgreSQL"
+        })
 
     except Exception as e:
         db.session.rollback()
@@ -1055,19 +1017,6 @@ def auto_clear_textbox():
         ticket.textbox = ''
         db.session.commit()
 
-        # อัปเดต Google Sheets
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-        client = gspread.authorize(creds)
-        sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
-        cell = sheet.find(ticket_id)
-        if cell:
-            headers = sheet.row_values(1)
-            if "TEXTBOX" in headers:
-                textbox_col = headers.index("TEXTBOX") + 1
-                sheet.update_cell(cell.row, textbox_col, '')
-
         return jsonify({"success": True, "message": "Textbox cleared automatically"})
 
     except Exception as e:
@@ -1087,24 +1036,6 @@ def clear_textboxes():
         for ticket in tickets_with_textbox:
             ticket.textbox = ''
         db.session.commit()
-
-        # 3. อัปเดต Google Sheets
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-        client = gspread.authorize(creds)
-        sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
-        headers = sheet.row_values(1)
-        if "TEXTBOX" in headers:
-            textbox_col = headers.index("TEXTBOX") + 1
-            
-            for ticket in tickets_with_textbox:
-                try:
-                    cell = sheet.find(ticket.ticket_id)
-                    if cell:
-                        sheet.update_cell(cell.row, textbox_col, '')
-                except Exception:
-                    continue
 
         return jsonify({
             "success": True,
@@ -1184,57 +1115,36 @@ def update_textbox():
     if not ticket_id or new_text is None:
         return jsonify({"error": "ticket_id and text required"}), 400
 
-    # 1. Update PostgreSQL
     try:
-        with psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-            host=DB_HOST, port=DB_PORT
-        ) as conn:
-            with conn.cursor() as cur:
-                # Get current textbox value for comparison
-                cur.execute("SELECT textbox, user_id, name FROM tickets WHERE ticket_id = %s", (ticket_id,))
-                result = cur.fetchone()
+        # Update PostgreSQL using SQLAlchemy
+        ticket = Ticket.query.get(ticket_id)
+        if not ticket:
+            return jsonify({"error": "Ticket not found"}), 404
+            
+        current_text = ticket.textbox
+        
+        # Only proceed if text is actually changing
+        if current_text != new_text:
+            # Update textbox
+            ticket.textbox = new_text
+            
+            # Create notification (ไม่สร้าง notification สำหรับประกาศ)
+            if not is_announcement:
+                notification = Notification()
+                notification.message = f"New message for ticket {ticket_id} ({ticket.name}): {new_text}"
+                db.session.add(notification)
+            
+            # Send LINE message if user_id exists
+            if ticket.user_id and not is_announcement:
+                send_textbox_message(ticket.user_id, new_text)
                 
-                if not result:
-                    return jsonify({"error": "Ticket not found"}), 404
-                    
-                current_text, user_id, name = result
-                
-                # Only proceed if text is actually changing
-                if current_text != new_text:
-                    # Update textbox
-                    cur.execute("UPDATE tickets SET textbox = %s WHERE ticket_id = %s", (new_text, ticket_id))
-                    
-                    # Create notification (ไม่สร้าง notification สำหรับประกาศ)
-                    if not is_announcement:
-                        message = f"New message for ticket {ticket_id} ({name}): {new_text}"
-                        cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
-                    
-                    # Send LINE message if user_id exists
-                    if user_id and not is_announcement:
-                        send_textbox_message(user_id, new_text)
-                        
-                    conn.commit()
-    except psycopg2.Error as e:
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
-
-    # 2. Update Google Sheets
-    try:
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-        client = gspread.authorize(creds)
-        sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
-        cell = sheet.find(ticket_id)
-        if cell:
-            headers = sheet.row_values(1)
-            if "TEXTBOX" in headers:
-                textbox_col = headers.index("TEXTBOX") + 1
-                sheet.update_cell(cell.row, textbox_col, new_text)
-            return jsonify({"message": "Updated textbox in PostgreSQL and Google Sheets"})
-        return jsonify({"error": "Ticket ID not found in sheet"}), 404
-    except Exception:
-        return jsonify({"error": "Ticket ID not found in sheet"}), 404
+            db.session.commit()
+            
+        return jsonify({"message": "Updated textbox in PostgreSQL"})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/email-rankings')
 def get_email_rankings():
@@ -1280,65 +1190,31 @@ def send_announcement():
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD,
-            host=DB_HOST, port=DB_PORT
-        )
-        cur = conn.cursor()
-
-        # 1. ดึงรายชื่อผู้ใช้ทั้งหมดที่ต้องการส่งประกาศ
-        cur.execute("""
-            SELECT ticket_id, user_id, email, name 
-            FROM tickets 
-            WHERE type = 'Information' 
-            AND user_id IS NOT NULL
-        """)
-        recipients = cur.fetchall()
+        # 1. ดึงรายชื่อผู้ใช้ทั้งหมดที่ต้องการส่งประกาศ using SQLAlchemy
+        tickets = Ticket.query.filter(
+            Ticket.type == 'Information',
+            Ticket.user_id.isnot(None)
+        ).all()
 
         recipient_count = 0
         full_message = f"{announcement_message}"
 
         # 2. อัปเดต TEXTBOX และส่ง LINE Message
-        for recipient in recipients:
-            ticket_id, user_id, email, name = recipient
-            
+        for ticket in tickets:
             # อัปเดต TEXTBOX ใน PostgreSQL
-            cur.execute(
-                "UPDATE tickets SET textbox = %s WHERE ticket_id = %s",
-                (full_message, ticket_id)
-            )
+            ticket.textbox = full_message
 
             # ส่ง LINE Message
-            if user_id:
-                send_announcement_message(user_id, full_message, name)
+            if ticket.user_id:
+                send_announcement_message(ticket.user_id, full_message, ticket.name)
                 recipient_count += 1
 
-        # 3. อัปเดต Google Sheets
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-        client = gspread.authorize(creds)
-        sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
+        # 3. สร้าง notification ในระบบ
+        notification = Notification()
+        notification.message = f"ประกาศใหม่: {announcement_message}"
+        db.session.add(notification)
 
-        headers = sheet.row_values(1)
-        if "TEXTBOX" in headers:
-            textbox_col = headers.index("TEXTBOX") + 1
-            # หาแถวทั้งหมดที่ต้องการอัปเดต
-            for recipient in recipients:
-                ticket_id = recipient[0]
-                try:
-                    cell = sheet.find(ticket_id)
-                    if cell:
-                        sheet.update_cell(cell.row, textbox_col, full_message)
-                except Exception:
-                    continue
-
-        # 4. สร้าง notification ในระบบ
-        cur.execute(
-            "INSERT INTO notifications (message) VALUES (%s)",
-            (f"ประกาศใหม่: {announcement_message}",)
-        )
-
-        conn.commit()
+        db.session.commit()
         return jsonify({
             "success": True,
             "recipient_count": recipient_count,
@@ -1346,11 +1222,8 @@ def send_announcement():
         })
 
     except Exception as e:
-        conn.rollback()
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        if 'conn' in locals():
-            conn.close()
 
 
 
@@ -1485,40 +1358,23 @@ def update_ticket():
     if not ticket_id:
         return jsonify({"error": "ticket_id is required"}), 400
 
-    # --- 1. อัปเดต PostgreSQL ---
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    if new_status is not None:
-        cur.execute("UPDATE tickets SET status = %s WHERE ticket_id = %s;", (new_status, ticket_id))
-    if new_textbox is not None:
-        cur.execute("UPDATE tickets SET textbox = %s WHERE ticket_id = %s;", (new_textbox, ticket_id))
-    conn.commit()
-    conn.close()
-
-    # --- 2. อัปเดต Google Sheets ---
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-    client = gspread.authorize(creds)
-    sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
     try:
-        cell = sheet.find(ticket_id)
-        if cell:
-            headers = sheet.row_values(1)
-            if new_status is not None and "สถานะ" in headers:
-                status_col = headers.index("สถานะ") + 1
-                sheet.update_cell(cell.row, status_col, new_status)
-            if new_textbox is not None and "TEXTBOX" in headers:
-                textbox_col = headers.index("TEXTBOX") + 1
-                sheet.update_cell(cell.row, textbox_col, new_textbox)
-        else:
-            return jsonify({"error": "Ticket ID not found in sheet"}), 404
-    except Exception:
-        return jsonify({"error": "Ticket ID not found in sheet"}), 404
-
-    return jsonify({"message": "Ticket updated in PostgreSQL and Google Sheets"})
+        # Update PostgreSQL using SQLAlchemy
+        ticket = Ticket.query.get(ticket_id)
+        if not ticket:
+            return jsonify({"error": "Ticket not found"}), 404
+        
+        if new_status is not None:
+            ticket.status = new_status
+        if new_textbox is not None:
+            ticket.textbox = new_textbox
+            
+        db.session.commit()
+        return jsonify({"message": "Ticket updated in PostgreSQL"})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/data-by-date', methods=['GET'])
 def get_data_by_date():
@@ -1631,61 +1487,33 @@ def add_message():
     if not all([ticket_id, sender_name, message]):
         return jsonify({"error": "Missing required fields"}), 400
 
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    
     try:
-        # เพิ่มข้อความใหม่
-        cur.execute("""
-            INSERT INTO messages (ticket_id, admin_id, sender_name, message, is_admin_message)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id, timestamp
-        """, (ticket_id, admin_id, sender_name, message, is_admin_message))
+        # เพิ่มข้อความใหม่ using SQLAlchemy
+        new_message = Message()
+        new_message.ticket_id = ticket_id
+        new_message.admin_id = admin_id
+        new_message.sender_name = sender_name
+        new_message.message = message
+        new_message.is_admin_message = is_admin_message
         
-        new_message = cur.fetchone()
+        db.session.add(new_message)
         
-        if new_message:
-            # อัปเดต TEXTBOX ในตาราง tickets เป็นค่าว่างทันที
-            cur.execute("""
-                UPDATE tickets 
-                SET textbox = '' 
-                WHERE ticket_id = %s
-            """, (ticket_id,))
-            
-            conn.commit()
-            
-            # อัปเดต Google Sheets ให้ textbox เป็นค่าว่าง
-            scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-            creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-            client = gspread.authorize(creds)
-            sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-
-            try:
-                cell = sheet.find(ticket_id)
-                if cell:
-                    headers = sheet.row_values(1)
-                    if "TEXTBOX" in headers:
-                        textbox_col = headers.index("TEXTBOX") + 1
-                        sheet.update_cell(cell.row, textbox_col, '')
-            except Exception:
-                pass  # ไม่ต้องทำอะไรถ้าไม่พบ ticket ใน sheet
-            
-            return jsonify({
-                "id": new_message[0],
-                "timestamp": new_message[1].isoformat(),
-                "success": True
-            })
-        else:
-            return jsonify({"error": "Failed to create message"}), 500
+        # อัปเดต TEXTBOX ในตาราง tickets เป็นค่าว่างทันที
+        ticket = Ticket.query.get(ticket_id)
+        if ticket:
+            ticket.textbox = ''
+        
+        db.session.commit()
+        
+        return jsonify({
+            "id": new_message.id,
+            "timestamp": new_message.timestamp.isoformat(),
+            "success": True
+        })
         
     except Exception as e:
-        conn.rollback()
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    finally:
-        if 'conn' in locals():
-            conn.close()
 
 @app.route('/api/messages/mark-read', methods=['POST'])
 def mark_messages_read():
@@ -1731,7 +1559,7 @@ def mark_messages_read():
 @app.route('/sync-tickets')
 def sync_route():
     try:
-        print("Starting sync process...")
+        print("Starting PostgreSQL-only sync process...")
         
         # ตรวจสอบการเชื่อมต่อฐานข้อมูล
         try:
@@ -1748,29 +1576,17 @@ def sync_route():
                 "message": str(db_error)
             }), 500
         
-        # สร้างตารางและ sync ข้อมูล
+        # สร้างตาราง
         try:
             with app.app_context():
                 print("Creating tables...")
                 create_tickets_table()
                 print("Tables created successfully")
-                
-                print("Starting Google Sheets sync...")
-                try:
-                    new_tickets = sync_google_sheet_to_postgres()
-                    print(f"Google Sheets sync completed. New tickets: {len(new_tickets) if new_tickets else 0}")
-                except Exception as gs_error:
-                    print(f"Google Sheets sync failed: {str(gs_error)}")
-                    print("Falling back to simple sync...")
-                    # ถ้า Google Sheets sync ล้มเหลว ให้ใช้ simple sync แทน
-                    pass
-        except Exception as sync_error:
-            print(f"Sync error: {str(sync_error)}")
-            import traceback
-            traceback.print_exc()
+        except Exception as table_error:
+            print(f"Table creation error: {str(table_error)}")
             return jsonify({
-                "error": "Sync failed",
-                "message": str(sync_error)
+                "error": "Table creation failed",
+                "message": str(table_error)
             }), 500
         
         # ดึงข้อมูลจากฐานข้อมูล
@@ -1826,8 +1642,13 @@ def sync_route():
                 for row in rows
             ]
             
-            print("Sync process completed successfully")
-            return jsonify(result)
+            print("PostgreSQL-only sync process completed successfully")
+            return jsonify({
+                "success": True,
+                "message": "Data retrieved from PostgreSQL successfully",
+                "ticket_count": len(rows),
+                "data": result
+            })
             
         except Exception as query_error:
             print(f"Query error: {str(query_error)}")
@@ -2311,8 +2132,31 @@ def test_google_sheets():
             "message": str(e)
         }), 500
 
+@app.route('/clear-textboxes', methods=['POST'])
+def clear_textboxes():
+    try:
+        # 1. ค้นหา tickets ที่มี textbox ไม่ว่าง using SQLAlchemy
+        tickets_with_textbox = Ticket.query.filter(
+            Ticket.textbox.isnot(None), 
+            Ticket.textbox != ''
+        ).all()
+
+        # 2. ลบ textbox ใน PostgreSQL
+        for ticket in tickets_with_textbox:
+            ticket.textbox = ''
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "cleared_count": len(tickets_with_textbox),
+            "message": f"Cleared {len(tickets_with_textbox)} textboxes"
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
-        sync_google_sheet_to_postgres()
     app.run(host='0.0.0.0', port=5001, debug=False)
