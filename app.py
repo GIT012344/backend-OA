@@ -1,35 +1,24 @@
+import eventlet
+eventlet.monkey_patch()
 from flask import Flask, jsonify, request
 import requests
 from flask_cors import CORS 
 import psycopg2
-import gspread
-from google.oauth2.service_account import Credentials
 from datetime import datetime
 import os
-from datetime import timedelta
 from flask_caching import Cache
 from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import (
-    JWTManager, jwt_required, create_access_token,
-    get_jwt_identity
-)
-from werkzeug.security import generate_password_hash, check_password_hash
-import bcrypt
+from flask_socketio import SocketIO, emit
+import traceback
+
 
 LINE_ACCESS_TOKEN = "0C9ZwOVQ7BOY9dLLfvEqAP+RhpIXmlpcuHf4fgJ184c0nvKzc5S+rKAyjh7yDqadGK1VNxe36n+nswrYaDSLCKOGmhuXjrsRgspH1RF4hGWdgOrrMlBhGnYQjxB9jHDSXVHO5HYkjLJdWOarG8PXKQdB04t89/1O/w1cDnyilFU="
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-app.config['JWT_SECRET_KEY'] = 'your-secret-key-here'  # ควรเปลี่ยนเป็นค่าที่ปลอดภัยใน production
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)  # Token หมดอายุใน 24 ชั่วโมง
-app.config['JWT_TOKEN_LOCATION'] = ['headers']
-app.config['JWT_HEADER_NAME'] = 'Authorization'
-app.config['JWT_HEADER_TYPE'] = 'Bearer'
-jwt = JWTManager(app)
-
-# แก้ไข CORS ให้รองรับทุก origin
-CORS(app, origins=["*"], supports_credentials=True)
+CORS(app)
 
 DB_NAME = 'datagit'
 DB_USER = 'git'
@@ -41,11 +30,6 @@ DB_PORT = 5432
 app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
-# Google Sheets config
-SHEET_NAME = 'Tickets'  # ชื่อ Google Sheet ที่มีข้อมูล
-WORKSHEET_NAME = 'Sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
-CREDENTIALS_FILE = 'credentials.json'
 
 # Define SQLAlchemy models
 class Ticket(db.Model):
@@ -59,7 +43,7 @@ class Ticket(db.Model):
     department = db.Column(db.String)
     created_at = db.Column(db.DateTime)
     status = db.Column(db.String)
-    appointment = db.Column(db.String)
+    appointment = db.Column(db.DateTime, nullable=True)
     requested = db.Column(db.String)
     report = db.Column(db.String)
     type = db.Column(db.String)
@@ -84,75 +68,96 @@ class Message(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
     is_admin_message = db.Column(db.Boolean, default=False)
+    user_id = db.Column(db.String, nullable=True)
+    line_id = db.Column(db.String, nullable=True)
+    platform = db.Column(db.String, nullable=True)
 
 def send_textbox_message(user_id, message_text):
-    url = "https://api.line.me/v2/bot/message/push"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
-    }
+    try:
+        url = "https://api.line.me/v2/bot/message/push"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
+        }
 
-    # สร้าง Flex Message สำหรับ textbox reply
-    payload = {
-        "to": user_id,
-        "messages": [
-            {
-                "type": "flex",
-                "altText": "ข้อความจากเจ้าหน้าที่",
-                "contents": {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "💼 ตอบกลับจากเจ้าหน้าที่",
-                                "weight": "bold",
-                                "size": "lg",
-                                "color": "#005BBB"
-                            },
-                            {
-                                "type": "text",
-                                "text": message_text,
-                                "wrap": True,
-                                "margin": "md"
-                            },
-                            {
-                                "type": "text",
-                                "text": "พิมพ์ 'จบ' เพื่อสิ้นสุดการสนทนา",
-                                "size": "sm",
-                                "color": "#AAAAAA",
-                                "margin": "md"
+        # สร้าง Flex Message สำหรับ textbox reply
+        payload = {
+            "to": user_id,
+            "messages": [
+                {
+                    "type": "flex",
+                    "altText": "ข้อความจากเจ้าหน้าที่",
+                    "contents": {
+                        "type": "bubble",
+                        "altText": "ข้อความจากเจ้าหน้าที่",
+                        "contents": {
+                            "type": "bubble",
+                            "body": {
+                                "type": "box",
+                                "layout": "vertical",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "💼 ตอบกลับจากเจ้าหน้าที่",
+                                        "weight": "bold",
+                                        "size": "lg",
+                                        "color": "#005BBB"
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": message_text,
+                                        "wrap": True,
+                                        "margin": "md"
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "พิมพ์ 'จบ' เพื่อสิ้นสุดการสนทนา",
+                                        "size": "sm",
+                                        "color": "#AAAAAA",
+                                        "margin": "md"
+                                    }
+                                ]
                             }
-                        ]
+                        }
                     }
                 }
-            }
-        ]
-    }
+            ]
+        }
 
-    # ส่งข้อความไปยัง LINE Messaging API
-    response = requests.post(url, headers=headers, json=payload)
-    return response.status_code == 200
+        # ส่งข้อความไปยัง LINE Messaging API
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code != 200:
+            print(f"[send_textbox_message] LINE API Error: {response.status_code} - {response.text}")
+        return response.status_code == 200
+    except Exception as e:
+        print(f"[send_textbox_message] Exception: {e}")
+        print(traceback.format_exc())
+        return False
 
 def notify_user(payload):
-    url = "https://api.line.me/v2/bot/message/push"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
-    }
+    try:
+        url = "https://api.line.me/v2/bot/message/push"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
+        }
 
-    # แปลง payload เป็น Flex Message แบบเดียวกับใน Apps Script
-    flex_message = create_flex_message(payload)
+        # แปลง payload เป็น Flex Message แบบเดียวกับใน Apps Script
+        flex_message = create_flex_message(payload)
 
-    body = {
-        "to": payload['user_id'],
-        "messages": [flex_message]
-    }
+        body = {
+            "to": payload['user_id'],
+            "messages": [flex_message]
+        }
 
-    response = requests.post(url, headers=headers, json=body)
-    return response.status_code == 200
+        response = requests.post(url, headers=headers, json=body)
+        if response.status_code != 200:
+            print(f"[notify_user] LINE API Error: {response.status_code} - {response.text}")
+        return response.status_code == 200
+    except Exception as e:
+        print(f"[notify_user] Exception: {e}")
+        print(traceback.format_exc())
+        return False
 
 
 
@@ -432,160 +437,60 @@ def create_flex_message(payload):
         }
     }
 
+def safe_isoformat(dt):
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt)
+        except Exception:
+            return dt  # ถ้าแปลงไม่ได้ ส่ง string กลับไปเลย
+    if isinstance(dt, datetime):
+        return dt.isoformat()
+    return None
 
-def sync_google_sheet_to_postgres():
+@app.route('/api/upcoming-appointments')
+def get_upcoming_appointments():
     try:
-        # 1. Connect to Google Sheets
-        scope = ['https://spreadsheets.google.com/feeds', 
-                'https://www.googleapis.com/auth/drive']
+        # ดึง Ticket ทั้งหมดที่มีการนัดหมาย เรียงตามเวลานัดหมายจากใกล้ถึงไปไกล
+        tickets_with_appointment = Ticket.query.filter(
+            Ticket.appointment.isnot(None)
+        ).order_by(Ticket.appointment.asc()).limit(5).all()
         
-        # ตรวจสอบว่าไฟล์ credentials.json มีอยู่
-        if not os.path.exists(CREDENTIALS_FILE):
-            raise Exception(f"Credentials file {CREDENTIALS_FILE} not found")
+        result = []
+        for ticket in tickets_with_appointment:
+            # แปลงวันที่เป็นรูปแบบไทย
+            appointment_date = ticket.appointment
+            thai_months = [
+                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน',
+                'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม',
+                'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+            ]
+            thai_weekdays = [
+                'วันอาทิตย์', 'วันจันทร์', 'วันอังคาร', 'วันพุธ',
+                'วันพฤหัสบดี', 'วันศุกร์', 'วันเสาร์'
+            ]
             
-        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-        client = gspread.authorize(creds)
+            weekday = thai_weekdays[appointment_date.weekday()]
+            day = appointment_date.day
+            month = thai_months[appointment_date.month - 1]
+            year = appointment_date.year + 543  # แปลงเป็น พ.ศ.
+            time = appointment_date.strftime('%H:%M')
+            
+            thai_date = f"{weekday}ที่ {day} {month} พ.ศ. {year} เวลา {time}"
+            
+            result.append({
+                "ticket_id": ticket.ticket_id,
+                "name": ticket.name,
+                "appointment": thai_date,
+                "department": ticket.department,
+                "status": ticket.status,
+                "type": ticket.type,
+                "raw_appointment": safe_isoformat(appointment_date)
+            })
         
-        # เปิด sheet ด้วยชื่อ
-        try:
-            sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-            records = sheet.get_all_records()
-        except gspread.exceptions.SpreadsheetNotFound:
-            raise Exception(f"Google Sheet '{SHEET_NAME}' not found")
-        except gspread.exceptions.WorksheetNotFound:
-            raise Exception(f"Worksheet '{WORKSHEET_NAME}' not found")
-
-        # 2. Connect to PostgreSQL
-        try:
-            conn = psycopg2.connect(
-                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-                host=DB_HOST, port=DB_PORT
-            )
-            conn.autocommit = False  # ปิด autocommit เพื่อควบคุม transaction
-            cur = conn.cursor()
-        except psycopg2.Error as e:
-            raise Exception(f"Database connection error: {str(e)}")
-
-        # ดึง ticket_id จาก Google Sheets
-        sheet_ticket_ids = [str(row['Ticket ID']) for row in records if row.get('Ticket ID')]
-        
-        # 3. ลบข้อมูลใน Postgres ที่ไม่มีใน Google Sheets
-        if sheet_ticket_ids:
-            # ใช้ IN กับ list ของ ticket_ids
-            cur.execute("""
-                DELETE FROM tickets 
-                WHERE ticket_id NOT IN %s
-                AND ticket_id IS NOT NULL
-            """, (tuple(sheet_ticket_ids),))
-        else:
-            # ถ้าไม่มีเหลือใน Google Sheets เลย ลบทั้งหมด
-            cur.execute("DELETE FROM tickets;")
-
-        # 4. Sync (insert/update) ข้อมูลใหม่
-        textbox_updates = []
-        for row in records:
-            try:
-                ticket_id = str(row.get('Ticket ID', ''))
-                if not ticket_id:
-                    continue
-
-                current_textbox = None
-                # ดึงข้อมูล textbox ปัจจุบันจาก PostgreSQL
-                cur.execute("SELECT textbox FROM tickets WHERE ticket_id = %s", (ticket_id,))
-                result = cur.fetchone()
-                if result:
-                    current_textbox = result[0] if result[0] else None
-                
-                new_textbox = str(row.get('TEXTBOX', '')) if row.get('TEXTBOX') else None
-                
-                # ตรวจสอบว่า textbox มีการเปลี่ยนแปลงและไม่ว่างเปล่า
-                if new_textbox and new_textbox != current_textbox:
-                    # ถ้าเป็นข้อความจาก User (ไม่ใช่จาก Admin)
-                    if not new_textbox.startswith("Admin:"):
-                        user_name = str(row.get('ชื่อ', 'Unknown')) if row.get('ชื่อ') else 'Unknown'
-                        cur.execute("""
-                            INSERT INTO messages (
-                                ticket_id, sender_name, message, is_admin_message
-                            ) VALUES (%s, %s, %s, %s)
-                        """, (ticket_id, user_name, new_textbox, False))
-                        message = f"New message from {user_name} for ticket {ticket_id}: {new_textbox}"
-                        cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
-
-                cur.execute("""
-                    INSERT INTO tickets (
-                        ticket_id, user_id, email, name, phone,
-                        department, created_at, status, appointment,
-                        requested, report, type, textbox
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (ticket_id) DO UPDATE SET
-                        user_id = EXCLUDED.user_id,
-                        email = EXCLUDED.email,
-                        name = EXCLUDED.name,
-                        phone = EXCLUDED.phone,
-                        department = EXCLUDED.department,
-                        created_at = EXCLUDED.created_at,
-                        status = EXCLUDED.status,
-                        appointment = EXCLUDED.appointment,
-                        requested = EXCLUDED.requested,
-                        report = EXCLUDED.report,
-                        type = EXCLUDED.type,
-                        textbox = CASE 
-                            WHEN EXCLUDED.textbox != '' THEN EXCLUDED.textbox 
-                            ELSE tickets.textbox 
-                        END
-                """, (
-                    ticket_id,
-                    row.get('User ID', ''),
-                    row.get('อีเมล', ''),
-                    row.get('ชื่อ', ''),
-                    row.get('เบอร์ติดต่อ', ''),
-                    row.get('แผนก', ''),
-                    parse_datetime(row.get('วันที่แจ้ง', '')),
-                    row.get('สถานะ', ''),
-                    row.get('Appointment', ''),
-                    row.get('Requeste', ''),
-                    row.get('Report', ''),
-                    row.get('Type', ''),
-                    new_textbox
-                ))
-            except Exception as e:
-                print(f"ERROR: Error syncing row: {row.get('Ticket ID', 'N/A')} - {e}")
-                # Rollback transaction เมื่อเกิด error
-                conn.rollback()
-                raise e
-        
-        # เพิ่ม notification สำหรับ textbox ที่อัปเดต
-        for update in textbox_updates:
-            message = f"New message from {update['name']} for ticket {update['ticket_id']}: {update['message']}"
-            cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
-
-        # เพิ่ม notification สำหรับ ticket ใหม่
-        new_tickets = []
-        for row in records:
-            ticket_id = str(row.get('Ticket ID', ''))
-            if ticket_id:
-                cur.execute("SELECT 1 FROM tickets WHERE ticket_id = %s", (ticket_id,))
-                if not cur.fetchone():
-                    new_tickets.append(row)
-                    message = f"New ticket created: #{ticket_id} - {row.get('ชื่อ', '')} ({row.get('แผนก', '')})"
-                    cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
-
-        # Commit transaction
-        conn.commit()
-        conn.close()
-        return new_tickets
+        return jsonify(result)
         
     except Exception as e:
-        # จัดการข้อผิดพลาดและบันทึก log
-        print(f"ERROR: Error in sync_google_sheet_to_postgres: {str(e)}")
-        # Rollback transaction ถ้ายังไม่ได้ commit
-        if 'conn' in locals() and conn:
-            try:
-                conn.rollback()
-                conn.close()
-            except:
-                pass
-        raise  # ส่งข้อผิดพลาดต่อไปเพื่อให้ Flask จัดการ
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/notifications')
 def get_notifications():
@@ -597,7 +502,7 @@ def get_notifications():
         result.append({
             "id": notification.id,
             "message": notification.message,
-            "timestamp": notification.timestamp.isoformat(),
+            "timestamp": safe_isoformat(notification.timestamp),
             "read": notification.read
         })
     
@@ -644,206 +549,58 @@ def create_tickets_table():
     db.create_all()
 
 def parse_datetime(date_str):
+    if not date_str or str(date_str).lower() == 'none':
+        return None
     try:
-        return datetime.fromisoformat(date_str)
+        s = str(date_str).strip()
+        # ถ้าเจอช่วงเวลา 09:00-10:00 เอา 09:00 (หรือแยกเอาเฉพาะเวลาที่ต้องการ)
+        if '-' in s and not s.startswith('-'):
+            date_part, time_part = s.split(' ', 1) if ' ' in s else (s, '')
+            if '-' in time_part:
+                time_part = time_part.split('-')[0].strip()
+            s = f"{date_part} {time_part}".strip()
+        # ลอง format ต่างๆ
+        formats = [
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M',
+            '%Y-%m-%d',
+            '%d/%m/%Y %H:%M',
+            '%d/%m/%Y',
+            '%Y/%m/%d %H:%M',
+            '%d-%m-%Y %H:%M',
+        ]
+        for fmt in formats:
+            try:
+                return datetime.strptime(s, fmt)
+            except ValueError:
+                continue
+        return None
+    except Exception:
+        return None
+    try:
+        # รองรับทั้งเคส 26/06/2025 09:00-10:00
+        if '-' in str(date_str):
+            date_part, _ = str(date_str).split('-', 1)
+            date_str = date_part.strip()
+        formats = [
+            '%Y-%m-%d %H:%M:%S',
+            '%d/%m/%Y %H:%M',
+            '%Y-%m-%d',
+            '%d/%m/%Y',
+            '%Y-%m-%d %H:%M',
+            '%Y-%m-%dT%H:%M:%S',
+        ]
+        for fmt in formats:
+            try:
+                return datetime.strptime(str(date_str), fmt)
+            except ValueError:
+                continue
+        return None
     except Exception:
         return None
 
-class User(db.Model):
-    __tablename__ = 'users'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    pin = db.Column(db.String(10), unique=True, nullable=False)  # รหัส PIN
-    role = db.Column(db.String(20), default='user')  # 'user' หรือ 'admin'
-    name = db.Column(db.String(100), nullable=False)  # ชื่อผู้ใช้
-    is_active = db.Column(db.Boolean, default=True)  # สถานะการใช้งาน
-
-    def check_pin(self, pin):
-        return self.pin == pin and self.is_active
-
-# สร้างตาราง users
-def create_tables():
-    db.create_all()
-    
-    # สร้างผู้ใช้เริ่มต้นถ้ายังไม่มี
-    if not User.query.filter_by(pin='123456').first():
-        admin = User()
-        admin.pin = '123456'
-        admin.role = 'admin'
-        admin.name = 'ผู้ดูแลระบบ'
-        db.session.add(admin)
-        db.session.commit()
-    
-    # สร้างผู้ใช้ทั่วไป
-    if not User.query.filter_by(pin='000000').first():
-        user = User()
-        user.pin = '000000'
-        user.role = 'user'
-        user.name = 'ผู้ใช้ทั่วไป'
-        db.session.add(user)
-        db.session.commit()
-
-# เพิ่ม route สำหรับ login
-@app.route('/api/login', methods=['POST'])
-def login():
-    try:
-        print("=" * 50)
-        print("LOGIN REQUEST RECEIVED")
-        print("=" * 50)
-        print(f"Method: {request.method}")
-        print(f"URL: {request.url}")
-        print(f"Content-Type: {request.content_type}")
-        print(f"Content-Length: {request.content_length}")
-        print(f"Headers: {dict(request.headers)}")
-        
-        # ตรวจสอบ Content-Type
-        if request.content_type and 'application/json' not in request.content_type:
-            print(f"ERROR: Invalid content type: {request.content_type}")
-            return jsonify({"msg": "Content-Type must be application/json"}), 400
-
-        # ตรวจสอบว่าเป็น JSON หรือไม่
-        if not request.is_json:
-            print("ERROR: Request is not JSON")
-            # ลองอ่าน raw data
-            raw_data = request.get_data(as_text=True)
-            print(f"Raw data: {raw_data}")
-            return jsonify({"msg": "Missing JSON in request"}), 400
-
-        data = request.get_json()
-        print(f"SUCCESS: Received JSON data: {data}")
-        print(f"Data type: {type(data)}")
-        
-        if not data:
-            print("ERROR: No data received")
-            return jsonify({"msg": "Missing JSON data"}), 400
-
-        # รองรับหลายรูปแบบของ PIN
-        pin = None
-        print(f"Checking for pin in data keys: {list(data.keys())}")
-        
-        if 'pin' in data:
-            pin = data['pin']
-            print(f"Found 'pin' field: {pin}")
-        elif 'username' in data:
-            pin = data['username']
-            print(f"Found 'username' field: {pin}")
-        elif 'password' in data:
-            pin = data['password']
-            print(f"Found 'password' field: {pin}")
-        elif 'email' in data:
-            pin = data['email']
-            print(f"Found 'email' field: {pin}")
-        else:
-            print(f"ERROR: No valid field found. Available fields: {list(data.keys())}")
-            return jsonify({"msg": "Missing PIN/username/password/email field"}), 400
-
-        if not pin:
-            print("ERROR: PIN is empty or None")
-            return jsonify({"msg": "Missing PIN/username/password"}), 400
-
-        # แปลง PIN เป็น string
-        pin = str(pin).strip()
-        print(f"LOGIN: Login attempt with PIN: '{pin}' (length: {len(pin)})")
-
-        # ตรวจสอบว่ามีตาราง users หรือไม่
-        try:
-            user = User.query.filter_by(pin=pin).first()
-            print(f"USER: User found: {user}")
-            if user:
-                print(f"   - ID: {user.id}")
-                print(f"   - Name: {user.name}")
-                print(f"   - Role: {user.role}")
-                print(f"   - Active: {user.is_active}")
-        except Exception as db_error:
-            print(f"ERROR: Database error: {db_error}")
-            return jsonify({"msg": "Database connection error"}), 500
-
-        if not user:
-            print(f"ERROR: No user found with PIN: {pin}")
-            return jsonify({"msg": "Invalid PIN - User not found"}), 401
-        
-        if not user.check_pin(pin):
-            print(f"ERROR: PIN check failed for user: {user.name}")
-            return jsonify({"msg": "Invalid PIN - User inactive or PIN mismatch"}), 401
-
-        access_token = create_access_token(identity={
-            'pin': user.pin,
-            'role': user.role,
-            'name': user.name
-        })
-        
-        print(f"SUCCESS: Login successful for user: {user.name} (PIN: {user.pin})")
-        print("=" * 50)
-        
-        return jsonify({
-            "access_token": access_token,
-            "user": {
-                "name": user.name,
-                "role": user.role
-            }
-        }), 200
-        
-    except Exception as e:
-        print(f"ERROR: Login error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"msg": "Internal server error", "error": str(e)}), 500
-
-# เพิ่ม route สำหรับ logout
-@app.route('/api/logout', methods=['POST'])
-def logout():
-    try:
-        # ในระบบ JWT ไม่จำเป็นต้องทำอะไรกับ token เพราะ client จะลบ token เอง
-        # แต่เราสามารถเพิ่ม token ลงใน blacklist ได้ถ้าต้องการ
-        return jsonify({"msg": "Logout successful"}), 200
-    except Exception as e:
-        print(f"Logout error: {str(e)}")
-        return jsonify({"msg": "Logout error"}), 500
-
-# เพิ่ม route สำหรับตรวจสอบ token
-@app.route('/api/protected', methods=['GET'])
-@jwt_required()
-def protected():
-    try:
-        current_user = get_jwt_identity()
-        print(f"Protected route accessed by: {current_user}")
-        return jsonify(logged_in_as=current_user), 200
-    except Exception as e:
-        print(f"JWT validation error: {str(e)}")
-        return jsonify({"error": "Invalid token"}), 422
-
-# เพิ่ม route สำหรับตรวจสอบสถานะการล็อกอิน
-@app.route('/api/auth/status', methods=['GET'])
-def auth_status():
-    try:
-        # ตรวจสอบว่ามี Authorization header หรือไม่
-        auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return jsonify({"authenticated": False, "message": "No token provided"}), 401
-        
-        # ลบ "Bearer " ออกจาก token
-        if not auth_header.startswith('Bearer '):
-            return jsonify({"authenticated": False, "message": "Invalid token format"}), 401
-        
-        token = auth_header.replace('Bearer ', '')
-        
-        # ตรวจสอบ token โดยใช้ JWT
-        try:
-            current_user = get_jwt_identity()
-            return jsonify({
-                "authenticated": True,
-                "user": current_user
-            }), 200
-        except Exception as jwt_error:
-            print(f"JWT validation error: {str(jwt_error)}")
-            return jsonify({"authenticated": False, "message": "Invalid token"}), 401
-        
-    except Exception as e:
-        print(f"Auth status error: {str(e)}")
-        return jsonify({"authenticated": False, "message": "Server error"}), 500
-
 @app.route('/api/data')
-@cache.cached(timeout=60) 
+#   #@cache.cached(timeout=60) 
 def get_data():
     try:
         # Use SQLAlchemy to query tickets
@@ -856,12 +613,12 @@ def get_data():
                 "ชื่อ": ticket.name,
                 "เบอร์ติดต่อ": ticket.phone,
                 "แผนก": ticket.department,
-                "วันที่แจ้ง": ticket.created_at.isoformat() if ticket.created_at else "",
-                "สถานะ": ticket.status,
-                "Appointment": ticket.appointment,
-                "Requeste": ticket.requested,
-                "Report": ticket.report,
-                "Type": ticket.type
+                "วันที่แจ้ง": safe_isoformat(ticket.created_at) if ticket.created_at else "-",
+                "สถานะ": ticket.status if ticket.status else "-",
+                "Appointment": safe_isoformat(ticket.appointment) if ticket.appointment else None,
+                "Requeste": ticket.requested if ticket.requested else "-",
+                "Report": ticket.report if ticket.report else "-",
+                "Type": ticket.type if ticket.type else "-"
             }
             for ticket in tickets
         ]
@@ -869,28 +626,51 @@ def get_data():
         return jsonify(result)
         
     except Exception as e:
-        print(f"ERROR: Unexpected error in get_data: {str(e)}")
+        print(f"❌ Unexpected error in get_data: {str(e)}")
         return jsonify({
             "error": "Internal server error",
             "message": str(e)
         }), 500
 
+@app.route('/api/latest-service-appointments')
+def get_latest_service_appointments():
+    try:
+        # ดึง Ticket ประเภท Service ที่มีการนัดหมาย เรียงตามเวลานัดหมายจากใกล้ถึงไปไกล
+        service_tickets = Ticket.query.filter(
+            Ticket.type == 'Service',
+            Ticket.appointment.isnot(None)
+        ).order_by(Ticket.appointment.asc()).limit(5).all()
+        
+        result = []
+        for ticket in service_tickets:
+            result.append({
+                "ticket_id": ticket.ticket_id,
+                "name": ticket.name,
+                "appointment": ticket.appointment.strftime('%A, %d %B %Y %H:%M') if ticket.appointment else "-",
+                "department": ticket.department,
+                "status": ticket.status
+            })
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500        
+
 @app.route('/update-status', methods=['POST'])
 def update_status():
     data = request.get_json()
+    print(f"[update-status] data: {data}")
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
-        
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
-
+    print(f"[update-status] ticket_id: {ticket_id}")
     if not ticket_id or not new_status:
         return jsonify({"error": "ticket_id and status required"}), 400
-
     try:
-        # Update PostgreSQL using SQLAlchemy
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
+            print(f"[update-status] Ticket not found: {ticket_id}")
             return jsonify({"error": "Ticket not found"}), 404
             
         current_status = ticket.status
@@ -901,37 +681,60 @@ def update_status():
             ticket.status = new_status
             
             # Create notification
-            notification = Notification()
-            notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
+            notification = Notification(
+                message=f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
+            )
             db.session.add(notification)
-            
             db.session.commit()
-            
-            # Send LINE notification if user_id exists
+
+            # เตรียม payload สำหรับ notify_user
+            try:
+                if ticket.appointment:
+                    if isinstance(ticket.appointment, str):
+                        # พยายาม parse string เป็น datetime ก่อน
+                        try:
+                            dt = datetime.fromisoformat(ticket.appointment)
+                            appointment_str = dt.isoformat()
+                        except Exception:
+                            appointment_str = ticket.appointment  # ถ้า parse ไม่ได้ ส่ง string เดิม
+                    else:
+                        appointment_str = ticket.appointment.isoformat()
+                else:
+                    appointment_str = None
+            except Exception as e:
+                print(f"[update-status] appointment error: {e}")
+                appointment_str = None
+
+            payload = {
+                'user_id': ticket.user_id,
+                'ticket_id': ticket.ticket_id,
+                'name': ticket.name,
+                'phone': ticket.phone,
+                'department': ticket.department,
+                'status': ticket.status,
+                'appointment': appointment_str,
+                'type': ticket.type,
+                'report': ticket.report
+            }
             if ticket.user_id:
-                payload = {
-                    'ticket_id': ticket.ticket_id,
-                    'user_id': ticket.user_id,
-                    'status': new_status,
-                    'email': ticket.email,
-                    'name': ticket.name,
-                    'phone': ticket.phone,
-                    'department': ticket.department,
-                    'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
-                    'appointment': ticket.appointment,
-                    'requested': ticket.requested,
-                    'report': ticket.report,
-                    'type': ticket.type,
-                    'textbox': ticket.textbox,
-                }
-                notify_user(payload)
-                    
-            return jsonify({"message": "Status updated in PostgreSQL"})
+                try:
+                    notify_user(payload)
+                except Exception as e:
+                    print(f"[update-status] notify_user error: {e}")
+            # emit event ticket_updated
+            socketio.emit('ticket_updated', payload)
+            print('>>> emit ticket_updated', payload)
+            socketio.emit('refresh_data')
+            print('>>> emit refresh_data')
+            return jsonify({"message": "✅ Updated PostgreSQL"})
         else:
+            print('[update-status] Status unchanged')
             return jsonify({"message": "Status unchanged"})
             
     except Exception as e:
         db.session.rollback()
+        print(f"[update-status] Exception: {e}")
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @app.route('/delete-ticket', methods=['POST'])
@@ -950,24 +753,26 @@ def delete_ticket():
         Message.query.filter_by(ticket_id=ticket_id).delete()
         
         # 2. ลบ ticket จาก PostgreSQL
-        ticket = Ticket.query.get(ticket_id)
+        ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
         if not ticket:
             return jsonify({"error": "Ticket not found in database"}), 404
         
         db.session.delete(ticket)
         
         # 3. สร้าง notification
-        notification = Notification()
-        notification.message = f"Ticket {ticket_id} has been deleted"
+        notification = Notification(message=f"Ticket {ticket_id} has been deleted")
         db.session.add(notification)
         
         db.session.commit()
-
+        # emit event ticket_deleted
+        socketio.emit('ticket_deleted', {'ticket_id': ticket_id})
+        print('>>> emit ticket_deleted', {'ticket_id': ticket_id})
+        socketio.emit('refresh_data')
+        print('>>> emit refresh_data')
         return jsonify({
             "success": True, 
             "message": "Ticket deleted from PostgreSQL"
         })
-
     except Exception as e:
         db.session.rollback()
         print(f"Error deleting ticket: {str(e)}")
@@ -991,6 +796,8 @@ def delete_messages():
         # ลบข้อความทั้งหมดที่เกี่ยวข้องกับ ticket_id นี้
         Message.query.filter_by(ticket_id=ticket_id).delete()
         db.session.commit()
+        socketio.emit('refresh_data')
+        print('>>> emit refresh_data (delete-messages)')
         return jsonify({"success": True, "message": "Messages deleted successfully"})
     except Exception as e:
         db.session.rollback()
@@ -1016,12 +823,16 @@ def auto_clear_textbox():
         # ลบข้อมูลในตาราง tickets
         ticket.textbox = ''
         db.session.commit()
-
+        socketio.emit('refresh_data')
+        print('>>> emit refresh_data (auto-clear-textbox)')
         return jsonify({"success": True, "message": "Textbox cleared automatically"})
-
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
 
 @app.route('/clear-textboxes', methods=['POST'])
 def clear_textboxes():
@@ -1036,15 +847,16 @@ def clear_textboxes():
         for ticket in tickets_with_textbox:
             ticket.textbox = ''
         db.session.commit()
-
+        socketio.emit('refresh_data')
+        print('>>> emit refresh_data (clear-textboxes)')
         return jsonify({
             "success": True,
             "cleared_count": len(tickets_with_textbox),
             "message": f"Cleared {len(tickets_with_textbox)} textboxes"
         })
-
     except Exception as e:
         db.session.rollback()
+        print(f"clear_textboxes error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/refresh-messages', methods=['POST'])
@@ -1071,7 +883,7 @@ def refresh_messages():
                 "admin_id": message.admin_id,
                 "sender_name": message.sender_name,
                 "message": message.message,
-                "timestamp": message.timestamp.isoformat(),
+                "timestamp": safe_isoformat(message.timestamp),
                 "is_read": message.is_read,
                 "is_admin_message": message.is_admin_message
             })
@@ -1090,6 +902,8 @@ def refresh_messages():
             ).update({"is_read": True})
         
         db.session.commit()
+        socketio.emit('refresh_data')
+        print('>>> emit refresh_data')
         return jsonify({"messages": result, "success": True})
         
     except Exception as e:
@@ -1104,7 +918,7 @@ def update_textbox():
     if request.content_type != 'application/json':
         return jsonify({"error": "Content-Type must be application/json"}), 415
 
-    data = request.get_json()
+    data = request.json
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
         
@@ -1115,36 +929,42 @@ def update_textbox():
     if not ticket_id or new_text is None:
         return jsonify({"error": "ticket_id and text required"}), 400
 
+    # 1. Update PostgreSQL
     try:
-        # Update PostgreSQL using SQLAlchemy
-        ticket = Ticket.query.get(ticket_id)
-        if not ticket:
-            return jsonify({"error": "Ticket not found"}), 404
-            
-        current_text = ticket.textbox
-        
-        # Only proceed if text is actually changing
-        if current_text != new_text:
-            # Update textbox
-            ticket.textbox = new_text
-            
-            # Create notification (ไม่สร้าง notification สำหรับประกาศ)
-            if not is_announcement:
-                notification = Notification()
-                notification.message = f"New message for ticket {ticket_id} ({ticket.name}): {new_text}"
-                db.session.add(notification)
-            
-            # Send LINE message if user_id exists
-            if ticket.user_id and not is_announcement:
-                send_textbox_message(ticket.user_id, new_text)
+        with psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
+            host=DB_HOST, port=DB_PORT
+        ) as conn:
+            with conn.cursor() as cur:
+                # Get current textbox value for comparison
+                cur.execute("SELECT textbox, user_id, name FROM tickets WHERE ticket_id = %s", (ticket_id,))
+                result = cur.fetchone()
                 
-            db.session.commit()
-            
-        return jsonify({"message": "Updated textbox in PostgreSQL"})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+                if not result:
+                    return jsonify({"error": "Ticket not found"}), 404
+                    
+                current_text, user_id, name = result
+                
+                # Only proceed if text is actually changing
+                if current_text != new_text:
+                    # Update textbox
+                    cur.execute("UPDATE tickets SET textbox = %s WHERE ticket_id = %s", (new_text, ticket_id))
+                    
+                    # Create notification (ไม่สร้าง notification สำหรับประกาศ)
+                    if not is_announcement:
+                        message = f"New message for ticket {ticket_id} ({name}): {new_text}"
+                        cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
+                    
+                    # Send LINE message if user_id exists
+                    if user_id and not is_announcement:
+                        send_textbox_message(user_id, new_text)
+                    
+                    conn.commit()
+    except psycopg2.Error as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+    socketio.emit('refresh_data')
+    print('>>> emit refresh_data')
+    return jsonify({"message": "✅ Updated textbox in PostgreSQL"})
 
 @app.route('/api/email-rankings')
 def get_email_rankings():
@@ -1183,38 +1003,54 @@ def send_announcement():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
-    
     announcement_message = data.get('message')
 
     if not announcement_message:
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        # 1. ดึงรายชื่อผู้ใช้ทั้งหมดที่ต้องการส่งประกาศ using SQLAlchemy
-        tickets = Ticket.query.filter(
-            Ticket.type == 'Information',
-            Ticket.user_id.isnot(None)
-        ).all()
+        conn = psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD,
+            host=DB_HOST, port=DB_PORT
+        )
+        cur = conn.cursor()
+
+        # 1. ดึงรายชื่อผู้ใช้ทั้งหมดที่ต้องการส่งประกาศ
+        cur.execute("""
+            SELECT ticket_id, user_id, email, name 
+            FROM tickets 
+            WHERE type = 'Information' 
+            AND user_id IS NOT NULL
+        """)
+        recipients = cur.fetchall()
 
         recipient_count = 0
         full_message = f"{announcement_message}"
 
         # 2. อัปเดต TEXTBOX และส่ง LINE Message
-        for ticket in tickets:
+        for recipient in recipients:
+            ticket_id, user_id, email, name = recipient
+            
             # อัปเดต TEXTBOX ใน PostgreSQL
-            ticket.textbox = full_message
+            cur.execute(
+                "UPDATE tickets SET textbox = %s WHERE ticket_id = %s",
+                (full_message, ticket_id)
+            )
 
             # ส่ง LINE Message
-            if ticket.user_id:
-                send_announcement_message(ticket.user_id, full_message, ticket.name)
+            if user_id:
+                send_announcement_message(user_id, full_message, name)
                 recipient_count += 1
 
-        # 3. สร้าง notification ในระบบ
-        notification = Notification()
-        notification.message = f"ประกาศใหม่: {announcement_message}"
-        db.session.add(notification)
+        # 4. สร้าง notification ในระบบ
+        cur.execute(
+            "INSERT INTO notifications (message) VALUES (%s)",
+            (f"ประกาศใหม่: {announcement_message}",)
+        )
 
-        db.session.commit()
+        conn.commit()
+        socketio.emit('refresh_data')
+        print('>>> emit refresh_data')
         return jsonify({
             "success": True,
             "recipient_count": recipient_count,
@@ -1222,104 +1058,105 @@ def send_announcement():
         })
 
     except Exception as e:
-        db.session.rollback()
+        conn.rollback()
         return jsonify({"error": str(e)}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 
 
 
 def send_announcement_message(user_id, message, recipient_name=None):
-    url = "https://api.line.me/v2/bot/message/push"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
-    }
+    try:
+        url = "https://api.line.me/v2/bot/message/push"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
+        }
 
-    # สร้าง Flex Message สำหรับประกาศ
-    payload = {
-        "to": user_id,
-        "messages": [
-            {
-                "type": "flex",
-                "altText": "ประกาศจากระบบ",
-                "contents": {
-                    "type": "bubble",
-                    "size": "giga",
-                    "header": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "📢 ประกาศจากระบบ",
-                                "weight": "bold",
-                                "size": "lg",
-                                "color": "#FFFFFF",
-                                "align": "center"
-                            }
-                        ],
-                        "backgroundColor": "#FF6B6B",  # สีแดงสำหรับประกาศ
-                        "paddingAll": "20px"
-                    },
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": message,
-                                "wrap": True,
-                                "margin": "md"
-                            },
-                            {
-                                "type": "separator",
-                                "margin": "md"
-                            },
-                            {
-                                "type": "text",
-                                "text": "นี่คือข้อความประกาศจากระบบ กรุณาอ่านให้ละเอียด",
-                                "size": "sm",
-                                "color": "#888888",
-                                "margin": "md",
-                                "wrap": True
-                            }
-                        ],
-                        "paddingAll": "20px"
-                    },
-                    "footer": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "ขอบคุณที่ใช้บริการของเรา",
-                                "size": "xs",
-                                "color": "#888888",
-                                "align": "center"
-                            }
-                        ],
-                        "paddingAll": "10px"
+        # สร้าง Flex Message สำหรับประกาศ
+        payload = {
+            "to": user_id,
+            "messages": [
+                {
+                    "type": "flex",
+                    "altText": "ประกาศจากระบบ",
+                    "contents": {
+                        "type": "bubble",
+                        "size": "giga",
+                        "header": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "📢 ประกาศจากระบบ",
+                                    "weight": "bold",
+                                    "size": "lg",
+                                    "color": "#FFFFFF",
+                                    "align": "center"
+                                }
+                            ],
+                            "backgroundColor": "#FF6B6B",  # สีแดงสำหรับประกาศ
+                            "paddingAll": "20px"
+                        },
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": message,
+                                    "wrap": True,
+                                    "margin": "md"
+                                },
+                                {
+                                    "type": "separator",
+                                    "margin": "md"
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "นี่คือข้อความประกาศจากระบบ กรุณาอ่านให้ละเอียด",
+                                    "size": "sm",
+                                    "color": "#888888",
+                                    "margin": "md",
+                                    "wrap": True
+                                }
+                            ],
+                            "paddingAll": "20px"
+                        },
+                        "footer": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "ขอบคุณที่ใช้บริการของเรา",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "align": "center"
+                                }
+                            ],
+                            "paddingAll": "10px"
+                        }
                     }
                 }
-            }
-        ]
-    }
+            ]
+        }
 
-    try:
         response = requests.post(url, headers=headers, json=payload)
         if response.status_code != 200:
-            print(f"LINE API Error: {response.status_code} - {response.text}")
+            print(f"[send_announcement_message] LINE API Error: {response.status_code} - {response.text}")
         return response.status_code == 200
     except Exception as e:
-        print(f"Error sending LINE announcement: {str(e)}")
+        print(f"[send_announcement_message] Exception: {e}")
+        print(traceback.format_exc())
         return False
 
 @app.route('/delete-notification', methods=['POST'])
 def delete_notification():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-    
+    data = request.json
     notification_id = data.get('id')
     
     if not notification_id:
@@ -1335,50 +1172,10 @@ def delete_notification():
     
     return jsonify({"success": True})
 
-@app.route('/health')
-def health_check():
-    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
-
-@app.route('/update-ticket', methods=['POST', 'OPTIONS'])
-def update_ticket():
-    if request.method == 'OPTIONS':
-        return '', 200  # สำหรับ CORS preflight
-
-    if request.content_type != 'application/json':
-        return jsonify({"error": "Content-Type must be application/json"}), 415
-
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-    
-    ticket_id = data.get("ticket_id")
-    new_status = data.get("status")
-    new_textbox = data.get("textbox")
-
-    if not ticket_id:
-        return jsonify({"error": "ticket_id is required"}), 400
-
-    try:
-        # Update PostgreSQL using SQLAlchemy
-        ticket = Ticket.query.get(ticket_id)
-        if not ticket:
-            return jsonify({"error": "Ticket not found"}), 404
-        
-        if new_status is not None:
-            ticket.status = new_status
-        if new_textbox is not None:
-            ticket.textbox = new_textbox
-            
-        db.session.commit()
-        return jsonify({"message": "Ticket updated in PostgreSQL"})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/api/data-by-date', methods=['GET'])
 def get_data_by_date():
     date_str = request.args.get('date')
+    
     
     if not date_str:
         return jsonify({"error": "Date parameter is required"}), 400
@@ -1415,7 +1212,7 @@ def get_data_by_date():
                 "ชื่อ": row[2],
                 "เบอร์ติดต่อ": row[3],
                 "แผนก": row[4],
-                "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
+                "วันที่แจ้ง": safe_isoformat(row[5]) if row[5] else "",
                 "สถานะ": row[6],
                 "Appointment": row[7],
                 "Requeste": row[8],
@@ -1435,7 +1232,43 @@ def get_data_by_date():
         return jsonify({"error": str(e)}), 500
     finally:
         if 'conn' in locals():
-            conn.close()
+            conn.close()  
+
+@app.route('/update-ticket', methods=['POST', 'OPTIONS'])
+def update_ticket():
+    if request.method == 'OPTIONS':
+        return '', 200  # สำหรับ CORS preflight
+
+    if request.content_type != 'application/json':
+        return jsonify({"error": "Content-Type must be application/json"}), 415
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    ticket_id = data.get("ticket_id")
+    new_status = data.get("status")
+    new_textbox = data.get("textbox")
+
+    if not ticket_id:
+        return jsonify({"error": "ticket_id is required"}), 400
+
+    # --- 1. อัปเดต PostgreSQL ---
+    conn = psycopg2.connect(
+        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
+    )
+    cur = conn.cursor()
+    if new_status is not None:
+        cur.execute("UPDATE tickets SET status = %s WHERE ticket_id = %s;", (new_status, ticket_id))
+    if new_textbox is not None:
+        cur.execute("UPDATE tickets SET textbox = %s WHERE ticket_id = %s;", (new_textbox, ticket_id))
+    conn.commit()
+    conn.close()
+    # emit event ticket_updated
+    socketio.emit('ticket_updated', {'ticket_id': ticket_id, 'status': new_status, 'textbox': new_textbox})
+    print('>>> emit ticket_updated', {'ticket_id': ticket_id, 'status': new_status, 'textbox': new_textbox})
+    socketio.emit('refresh_data')
+    print('>>> emit refresh_data')
+    return jsonify({"message": "✅ Ticket updated in PostgreSQL"})
 
 @app.route('/api/messages', methods=['GET'])
 def get_messages():
@@ -1464,7 +1297,7 @@ def get_messages():
             "admin_id": row[2],
             "sender_name": row[3],
             "message": row[4],
-            "timestamp": row[5].isoformat(),
+            "timestamp": safe_isoformat(row[5]),
             "is_read": row[6],
             "is_admin_message": row[7]
         })
@@ -1477,50 +1310,129 @@ def add_message():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
-    
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
     sender_name = data.get('sender_name')
     message = data.get('message')
     is_admin_message = data.get('is_admin_message', False)
+    user_id = data.get('user_id')
+    line_id = data.get('line_id')
+    platform = data.get('platform')
 
     if not all([ticket_id, sender_name, message]):
         return jsonify({"error": "Missing required fields"}), 400
 
+    conn = psycopg2.connect(
+        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
+    )
+    cur = conn.cursor()
     try:
-        # เพิ่มข้อความใหม่ using SQLAlchemy
-        new_message = Message()
-        new_message.ticket_id = ticket_id
-        new_message.admin_id = admin_id
-        new_message.sender_name = sender_name
-        new_message.message = message
-        new_message.is_admin_message = is_admin_message
-        
-        db.session.add(new_message)
-        
-        # อัปเดต TEXTBOX ในตาราง tickets เป็นค่าว่างทันที
-        ticket = Ticket.query.get(ticket_id)
-        if ticket:
-            ticket.textbox = ''
-        
-        db.session.commit()
-        
+        # เพิ่มข้อความใหม่
+        cur.execute("""
+            INSERT INTO messages (ticket_id, admin_id, sender_name, message, is_admin_message, user_id, line_id, platform)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, timestamp
+        """, (ticket_id, admin_id, sender_name, message, is_admin_message, user_id, line_id, platform))
+        new_message = cur.fetchone()
+        if not new_message:
+            conn.rollback()
+            return jsonify({"error": "Failed to insert message"}), 500
+        conn.commit()
+        # emit event ticket_added
+        socketio.emit('ticket_added', {'ticket_id': ticket_id, 'admin_id': admin_id, 'sender_name': sender_name, 'message': message, 'is_admin_message': is_admin_message})
+        print('>>> emit ticket_added', {'ticket_id': ticket_id, 'admin_id': admin_id, 'sender_name': sender_name, 'message': message, 'is_admin_message': is_admin_message})
+        socketio.emit('refresh_data')
+        print('>>> emit refresh_data')
+        socketio.emit('new_message', {
+            'ticket_id': ticket_id,
+            'admin_id': admin_id,
+            'sender_name': sender_name,
+            'message': message,
+            'is_admin_message': is_admin_message
+        })
+        print('>>> emit new_message', {
+            'ticket_id': ticket_id,
+            'admin_id': admin_id,
+            'sender_name': sender_name,
+            'message': message,
+            'is_admin_message': is_admin_message
+        })
+        # (A) ถ้าเป็นข้อความจากแอดมิน ให้ยิง LINE API
+        if is_admin_message:
+            # ถ้า user_id ไม่ได้ส่งมา ให้ query จาก ticket_id
+            if not user_id:
+                cur.execute("SELECT user_id FROM tickets WHERE ticket_id = %s", (ticket_id,))
+                row = cur.fetchone()
+                user_id = row[0] if row else None
+            if user_id:
+                print(f"[add_message] send_textbox_message to LINE user_id={user_id}")
+                send_textbox_message(user_id, message)
+            else:
+                print(f"[add_message] No user_id found for ticket_id={ticket_id}, not sending to LINE")
         return jsonify({
-            "id": new_message.id,
-            "timestamp": new_message.timestamp.isoformat(),
+            "id": new_message[0],
+            "timestamp": safe_isoformat(new_message[1]),
             "success": True
         })
-        
     except Exception as e:
-        db.session.rollback()
+        conn.rollback()
+        print(f"[add_message] Exception: {e}")
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+# (B) เพิ่ม webhook สำหรับ LINE
+@app.route('/webhook/line', methods=['POST'])
+def webhook_line():
+    try:
+        data = request.get_json()
+        print(f"[webhook_line] data: {data}")
+        events = data.get('events', [])
+        for event in events:
+            if event.get('type') == 'message' and event['message'].get('type') == 'text':
+                user_id = event['source'].get('userId')
+                message_text = event['message'].get('text')
+                # หา ticket_id ล่าสุดของ user_id นี้ (หรือ logic mapping ตามที่เหมาะสม)
+                ticket_id = None
+                with psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT ticket_id FROM tickets WHERE user_id = %s ORDER BY created_at DESC LIMIT 1", (user_id,))
+                        row = cur.fetchone()
+                        if row:
+                            ticket_id = row[0]
+                if not ticket_id:
+                    print(f"[webhook_line] No ticket_id found for user_id={user_id}")
+                    continue
+                # insert message ลง db
+                with psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            INSERT INTO messages (ticket_id, sender_name, message, is_admin_message, user_id, platform)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (ticket_id, 'LINE User', message_text, False, user_id, 'LINE'))
+                        conn.commit()
+                # emit event new_message กลับหา frontend
+                socketio.emit('new_message', {
+                    'ticket_id': ticket_id,
+                    'admin_id': None,
+                    'sender_name': 'LINE User',
+                    'message': message_text,
+                    'is_admin_message': False
+                })
+                print(f"[webhook_line] emit new_message for ticket_id={ticket_id}")
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"[webhook_line] Exception: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/messages/mark-read', methods=['POST'])
 def mark_messages_read():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
-    
     ticket_id = data.get('ticket_id')
     admin_id = data.get('admin_id')
 
@@ -1559,528 +1471,17 @@ def mark_messages_read():
 @app.route('/sync-tickets')
 def sync_route():
     try:
-        print("Starting PostgreSQL-only sync process...")
-        
-        # ตรวจสอบการเชื่อมต่อฐานข้อมูล
-        try:
-            conn = psycopg2.connect(
-                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-                host=DB_HOST, port=DB_PORT
-            )
-            print("Database connection successful")
-            conn.close()
-        except Exception as db_error:
-            print(f"Database connection failed: {str(db_error)}")
-            return jsonify({
-                "error": "Database connection failed",
-                "message": str(db_error)
-            }), 500
-        
-        # สร้างตาราง
-        try:
-            with app.app_context():
-                print("Creating tables...")
-                create_tickets_table()
-                print("Tables created successfully")
-        except Exception as table_error:
-            print(f"Table creation error: {str(table_error)}")
-            return jsonify({
-                "error": "Table creation failed",
-                "message": str(table_error)
-            }), 500
-        
-        # ดึงข้อมูลจากฐานข้อมูล
-        try:
-            conn = psycopg2.connect(
-                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-                host=DB_HOST, port=DB_PORT
-            )
-            cur = conn.cursor()
-            
-            # ตรวจสอบว่าตาราง tickets มีอยู่หรือไม่
-            cur.execute("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'tickets'
-                );
-            """)
-            result = cur.fetchone()
-            table_exists = result[0] if result else False
-            
-            if not table_exists:
-                print("Tickets table does not exist")
-                return jsonify({
-                    "error": "Tickets table not found",
-                    "message": "Please run init-users first"
-                }), 500
-            
-            cur.execute("""
-                SELECT ticket_id, email, name, phone, department, created_at, 
-                       status, appointment, requested, report, type, textbox 
-                FROM tickets
-                ORDER BY created_at DESC;
-            """)
-            rows = cur.fetchall()
-            print(f"Retrieved {len(rows)} tickets from database")
-            conn.close()
-            
-            result = [
-                {
-                    "Ticket ID": row[0],
-                    "อีเมล": row[1],
-                    "ชื่อ": row[2],
-                    "เบอร์ติดต่อ": row[3],
-                    "แผนก": row[4],
-                    "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
-                    "สถานะ": row[6],
-                    "Appointment": row[7],
-                    "Requeste": row[8],
-                    "Report": row[9],
-                    "Type": row[10],
-                    "TEXTBOX": row[11]
-                }
-                for row in rows
-            ]
-            
-            print("PostgreSQL-only sync process completed successfully")
-            return jsonify({
-                "success": True,
-                "message": "Data retrieved from PostgreSQL successfully",
-                "ticket_count": len(rows),
-                "data": result
-            })
-            
-        except Exception as query_error:
-            print(f"Query error: {str(query_error)}")
-            return jsonify({
-                "error": "Database query failed",
-                "message": str(query_error)
-            }), 500
-        
+        create_tickets_table()
+        return jsonify({"message": "Sync route called but no Google Sheets sync logic implemented"})
     except Exception as e:
-        print(f"Unexpected error in sync_route: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({
             "error": "Internal Server Error",
             "message": str(e),
             "status": 500
         }), 500
 
-@app.route('/api/users', methods=['GET'])
-@jwt_required()
-def get_users():
-    try:
-        users = User.query.all()
-        result = []
-        for user in users:
-            result.append({
-                "id": user.id,
-                "pin": user.pin,
-                "name": user.name,
-                "role": user.role,
-                "is_active": user.is_active
-            })
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/users', methods=['POST'])
-@jwt_required()
-def create_user():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-    
-    pin = data.get('pin')
-    name = data.get('name')
-    role = data.get('role', 'user')
-    
-    if not pin or not name:
-        return jsonify({"error": "PIN and name are required"}), 400
-    
-    # ตรวจสอบว่า PIN ซ้ำหรือไม่
-    if User.query.filter_by(pin=pin).first():
-        return jsonify({"error": "PIN already exists"}), 400
-    
-    try:
-        user = User()
-        user.pin = pin
-        user.role = role
-        user.name = name
-        db.session.add(user)
-        db.session.commit()
-        return jsonify({
-            "success": True,
-            "user": {
-                "id": user.id,
-                "pin": user.pin,
-                "name": user.name,
-                "role": user.role
-            }
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/users/<int:user_id>', methods=['PUT'])
-@jwt_required()
-def update_user(user_id):
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-    
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    try:
-        if 'name' in data:
-            user.name = data['name']
-        if 'role' in data:
-            user.role = data['role']
-        if 'is_active' in data:
-            user.is_active = data['is_active']
-        
-        db.session.commit()
-        return jsonify({
-            "success": True,
-            "user": {
-                "id": user.id,
-                "pin": user.pin,
-                "name": user.name,
-                "role": user.role,
-                "is_active": user.is_active
-            }
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/users/<int:user_id>', methods=['DELETE'])
-@jwt_required()
-def delete_user(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    try:
-        db.session.delete(user)
-        db.session.commit()
-        return jsonify({"success": True, "message": "User deleted successfully"})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/status')
-def system_status():
-    try:
-        # ตรวจสอบการเชื่อมต่อฐานข้อมูล
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-            host=DB_HOST, port=DB_PORT
-        )
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM tickets")
-        result = cur.fetchone()
-        ticket_count = result[0] if result else 0
-        conn.close()
-        
-        return jsonify({
-            "status": "healthy",
-            "database": "connected",
-            "ticket_count": ticket_count,
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "database": "disconnected",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }), 500
-
-@app.route('/api/init-users')
-def init_users():
-    try:
-        with app.app_context():
-            # สร้างตารางทั้งหมด
-            db.create_all()
-            
-            # สร้างผู้ใช้เริ่มต้นถ้ายังไม่มี
-            if not User.query.filter_by(pin='123456').first():
-                admin = User()
-                admin.pin = '123456'
-                admin.role = 'admin'
-                admin.name = 'ผู้ดูแลระบบ'
-                db.session.add(admin)
-                print("Created admin user with PIN: 123456")
-            
-            if not User.query.filter_by(pin='000000').first():
-                user = User()
-                user.pin = '000000'
-                user.role = 'user'
-                user.name = 'ผู้ใช้ทั่วไป'
-                db.session.add(user)
-                print("Created regular user with PIN: 000000")
-            
-            db.session.commit()
-            
-            # ดึงรายชื่อผู้ใช้ทั้งหมด
-            users = User.query.all()
-            user_list = []
-            for user in users:
-                user_list.append({
-                    "id": user.id,
-                    "pin": user.pin,
-                    "name": user.name,
-                    "role": user.role,
-                    "is_active": user.is_active
-                })
-            
-            return jsonify({
-                "success": True,
-                "message": "Users initialized successfully",
-                "users": user_list
-            })
-            
-    except Exception as e:
-        print(f"Error initializing users: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-@app.route('/api/test-db')
-def test_database():
-    try:
-        # ทดสอบการเชื่อมต่อ PostgreSQL
-        conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-            host=DB_HOST, port=DB_PORT
-        )
-        cur = conn.cursor()
-        
-        # ตรวจสอบว่าตาราง users มีอยู่หรือไม่
-        cur.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'users'
-            );
-        """)
-        result = cur.fetchone()
-        users_table_exists = result[0] if result else False
-        
-        # ตรวจสอบว่าตาราง tickets มีอยู่หรือไม่
-        cur.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'tickets'
-            );
-        """)
-        result = cur.fetchone()
-        tickets_table_exists = result[0] if result else False
-        
-        # นับจำนวนผู้ใช้
-        user_count = 0
-        if users_table_exists:
-            cur.execute("SELECT COUNT(*) FROM users")
-            result = cur.fetchone()
-            user_count = result[0] if result else 0
-        
-        # นับจำนวน tickets
-        ticket_count = 0
-        if tickets_table_exists:
-            cur.execute("SELECT COUNT(*) FROM tickets")
-            result = cur.fetchone()
-            ticket_count = result[0] if result else 0
-        
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "database_connected": True,
-            "users_table_exists": users_table_exists,
-            "tickets_table_exists": tickets_table_exists,
-            "user_count": user_count,
-            "ticket_count": ticket_count
-        })
-        
-    except Exception as e:
-        print(f"Database test error: {str(e)}")
-        return jsonify({
-            "success": False,
-            "database_connected": False,
-            "error": str(e)
-        }), 500
-
-@app.route('/api/reset-users')
-def reset_users():
-    try:
-        with app.app_context():
-            # ลบผู้ใช้เก่าทั้งหมด
-            User.query.delete()
-            db.session.commit()
-            print("Deleted all existing users")
-            
-            # สร้างผู้ใช้ใหม่
-            admin = User()
-            admin.pin = '123456'
-            admin.role = 'admin'
-            admin.name = 'ผู้ดูแลระบบ'
-            db.session.add(admin)
-            print("Created admin user with PIN: 123456")
-            
-            user = User()
-            user.pin = '000000'
-            user.role = 'user'
-            user.name = 'ผู้ใช้ทั่วไป'
-            db.session.add(user)
-            print("Created regular user with PIN: 000000")
-            
-            db.session.commit()
-            
-            # ดึงรายชื่อผู้ใช้ทั้งหมด
-            users = User.query.all()
-            user_list = []
-            for user in users:
-                user_list.append({
-                    "id": user.id,
-                    "pin": user.pin,
-                    "name": user.name,
-                    "role": user.role,
-                    "is_active": user.is_active
-                })
-            
-            return jsonify({
-                "success": True,
-                "message": "Users reset successfully",
-                "users": user_list
-            })
-            
-    except Exception as e:
-        print(f"Error resetting users: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-@app.route('/')
-def home():
-    return jsonify({
-        "message": "Backend is running",
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    })
-
-@app.route('/api/test')
-def test_api():
-    return jsonify({
-        "message": "API is working",
-        "status": "ok",
-        "timestamp": datetime.now().isoformat()
-    })
-
-@app.route('/api/sync-simple')
-def sync_simple():
-    try:
-        print("Starting simple sync process...")
-        
-        # สร้างตาราง
-        try:
-            with app.app_context():
-                print("Creating tables...")
-                create_tickets_table()
-                print("Tables created successfully")
-        except Exception as table_error:
-            print(f"Table creation error: {str(table_error)}")
-            return jsonify({
-                "error": "Table creation failed",
-                "message": str(table_error)
-            }), 500
-        
-        # ดึงข้อมูลจากฐานข้อมูล
-        try:
-            conn = psycopg2.connect(
-                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-                host=DB_HOST, port=DB_PORT
-            )
-            cur = conn.cursor()
-            
-            # ตรวจสอบว่าตาราง tickets มีอยู่หรือไม่
-            cur.execute("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'tickets'
-                );
-            """)
-            result = cur.fetchone()
-            table_exists = result[0] if result else False
-            
-            if not table_exists:
-                print("Tickets table does not exist")
-                return jsonify({
-                    "error": "Tickets table not found",
-                    "message": "Table creation failed"
-                }), 500
-            
-            cur.execute("""
-                SELECT ticket_id, email, name, phone, department, created_at, 
-                       status, appointment, requested, report, type, textbox 
-                FROM tickets
-                ORDER BY created_at DESC;
-            """)
-            rows = cur.fetchall()
-            print(f"Retrieved {len(rows)} tickets from database")
-            conn.close()
-            
-            result = [
-                {
-                    "Ticket ID": row[0],
-                    "อีเมล": row[1],
-                    "ชื่อ": row[2],
-                    "เบอร์ติดต่อ": row[3],
-                    "แผนก": row[4],
-                    "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
-                    "สถานะ": row[6],
-                    "Appointment": row[7],
-                    "Requeste": row[8],
-                    "Report": row[9],
-                    "Type": row[10],
-                    "TEXTBOX": row[11]
-                }
-                for row in rows
-            ]
-            
-            print("Simple sync process completed successfully")
-            return jsonify({
-                "success": True,
-                "message": "Tables created and data retrieved successfully",
-                "ticket_count": len(rows),
-                "data": result
-            })
-            
-        except Exception as query_error:
-            print(f"Query error: {str(query_error)}")
-            return jsonify({
-                "error": "Database query failed",
-                "message": str(query_error)
-            }), 500
-        
-    except Exception as e:
-        print(f"Unexpected error in sync_simple: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": str(e)
-        }), 500
-
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    print(app.url_map)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False)
