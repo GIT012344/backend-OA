@@ -12,4 +12,5 @@ flask-sqlalchemy
 flask-jwt-extended
 bcrypt
 eventlet
+flask_socketio
 
