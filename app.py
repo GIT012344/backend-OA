@@ -1484,4 +1484,4 @@ if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
     print(app.url_map)
-    socketio.run(app, host='0.0.0.0', port=5004, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False)
