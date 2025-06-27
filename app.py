@@ -439,14 +439,12 @@ def sync_google_sheet_to_postgres():
         scope = ['https://spreadsheets.google.com/feeds', 
                 'https://www.googleapis.com/auth/drive']
         
-        # ตรวจสอบว่าไฟล์ credentials.json มีอยู่
         if not os.path.exists(CREDENTIALS_FILE):
             raise Exception(f"Credentials file {CREDENTIALS_FILE} not found")
             
         creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
         client = gspread.authorize(creds)
         
-        # เปิด sheet ด้วยชื่อ
         try:
             sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
             records = sheet.get_all_records()
@@ -461,7 +459,7 @@ def sync_google_sheet_to_postgres():
                 dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
                 host=DB_HOST, port=DB_PORT
             )
-            conn.autocommit = False  # ปิด autocommit เพื่อควบคุม transaction
+            conn.autocommit = False
             cur = conn.cursor()
         except psycopg2.Error as e:
             raise Exception(f"Database connection error: {str(e)}")
@@ -471,14 +469,12 @@ def sync_google_sheet_to_postgres():
         
         # 3. ลบข้อมูลใน Postgres ที่ไม่มีใน Google Sheets
         if sheet_ticket_ids:
-            # ใช้ IN กับ list ของ ticket_ids
             cur.execute("""
                 DELETE FROM tickets 
                 WHERE ticket_id NOT IN %s
                 AND ticket_id IS NOT NULL
             """, (tuple(sheet_ticket_ids),))
         else:
-            # ถ้าไม่มีเหลือใน Google Sheets เลย ลบทั้งหมด
             cur.execute("DELETE FROM tickets;")
 
         # 4. Sync (insert/update) ข้อมูลใหม่
@@ -489,12 +485,10 @@ def sync_google_sheet_to_postgres():
                 if not ticket_id:
                     continue
 
-                current_textbox = None
                 # ดึงข้อมูล textbox ปัจจุบันจาก PostgreSQL
                 cur.execute("SELECT textbox FROM tickets WHERE ticket_id = %s", (ticket_id,))
                 result = cur.fetchone()
-                if result:
-                    current_textbox = result[0] if result[0] else None
+                current_textbox = result[0] if result else None
                 
                 new_textbox = str(row.get('TEXTBOX', '')) if row.get('TEXTBOX') else None
                 
@@ -503,20 +497,30 @@ def sync_google_sheet_to_postgres():
                     # ถ้าเป็นข้อความจาก User (ไม่ใช่จาก Admin)
                     if not new_textbox.startswith("Admin:"):
                         user_name = str(row.get('ชื่อ', 'Unknown')) if row.get('ชื่อ') else 'Unknown'
+                        # บันทึกข้อความลงในตาราง messages
                         cur.execute("""
                             INSERT INTO messages (
                                 ticket_id, sender_name, message, is_admin_message
                             ) VALUES (%s, %s, %s, %s)
                         """, (ticket_id, user_name, new_textbox, False))
+                        
+                        # สร้าง notification
                         message = f"New message from {user_name} for ticket {ticket_id}: {new_textbox}"
                         cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
+                        
+                        # บันทึกการอัปเดต textbox เพื่อเคลียร์ทีหลัง
+                        textbox_updates.append({
+                            'ticket_id': ticket_id,
+                            'textbox': new_textbox
+                        })
 
+                # อัปเดตข้อมูล ticket โดยไม่เปลี่ยน textbox ถ้าไม่มีข้อมูลใหม่
                 cur.execute("""
                     INSERT INTO tickets (
                         ticket_id, user_id, email, name, phone,
                         department, created_at, status, appointment,
-                        requested, report, type, textbox
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        requested, report, type
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (ticket_id) DO UPDATE SET
                         user_id = EXCLUDED.user_id,
                         email = EXCLUDED.email,
@@ -528,11 +532,7 @@ def sync_google_sheet_to_postgres():
                         appointment = EXCLUDED.appointment,
                         requested = EXCLUDED.requested,
                         report = EXCLUDED.report,
-                        type = EXCLUDED.type,
-                        textbox = CASE 
-                            WHEN EXCLUDED.textbox != '' THEN EXCLUDED.textbox 
-                            ELSE tickets.textbox 
-                        END
+                        type = EXCLUDED.type
                 """, (
                     ticket_id,
                     row.get('User ID', ''),
@@ -545,19 +545,21 @@ def sync_google_sheet_to_postgres():
                     row.get('Appointment', ''),
                     row.get('Requeste', ''),
                     row.get('Report', ''),
-                    row.get('Type', ''),
-                    new_textbox
+                    row.get('Type', '')
                 ))
+
             except Exception as e:
                 print(f"ERROR: Error syncing row: {row.get('Ticket ID', 'N/A')} - {e}")
-                # Rollback transaction เมื่อเกิด error
                 conn.rollback()
                 raise e
         
-        # เพิ่ม notification สำหรับ textbox ที่อัปเดต
+        # เคลียร์ textbox ในตาราง tickets สำหรับข้อความที่ย้ายไปตาราง messages แล้ว
         for update in textbox_updates:
-            message = f"New message from {update['name']} for ticket {update['ticket_id']}: {update['message']}"
-            cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
+            cur.execute("""
+                UPDATE tickets 
+                SET textbox = ''
+                WHERE ticket_id = %s
+            """, (update['ticket_id'],))
 
         # เพิ่ม notification สำหรับ ticket ใหม่
         new_tickets = []
@@ -576,16 +578,14 @@ def sync_google_sheet_to_postgres():
         return new_tickets
         
     except Exception as e:
-        # จัดการข้อผิดพลาดและบันทึก log
         print(f"ERROR: Error in sync_google_sheet_to_postgres: {str(e)}")
-        # Rollback transaction ถ้ายังไม่ได้ commit
         if 'conn' in locals() and conn:
             try:
                 conn.rollback()
                 conn.close()
             except:
                 pass
-        raise  # ส่งข้อผิดพลาดต่อไปเพื่อให้ Flask จัดการ
+        raise
 
 @app.route('/api/notifications')
 def get_notifications():
@@ -1111,6 +1111,8 @@ def update_textbox():
     ticket_id = data.get("ticket_id")
     new_text = data.get("textbox")
     is_announcement = data.get("is_announcement", False)
+    admin_id = data.get("admin_id")
+    sender_name = data.get("sender_name", "Admin")
 
     if not ticket_id or new_text is None:
         return jsonify({"error": "ticket_id and text required"}), 400
@@ -1125,7 +1127,16 @@ def update_textbox():
         
         # Only proceed if text is actually changing
         if current_text != new_text:
-            # Update textbox
+            # บันทึกข้อความลงในตาราง messages ก่อน
+            new_message = Message()
+            new_message.ticket_id = ticket_id
+            new_message.admin_id = admin_id
+            new_message.sender_name = sender_name
+            new_message.message = new_text
+            new_message.is_admin_message = True
+            db.session.add(new_message)
+            
+            # Update textbox ในตาราง tickets
             ticket.textbox = new_text
             
             # Create notification (ไม่สร้าง notification สำหรับประกาศ)
@@ -1140,7 +1151,7 @@ def update_textbox():
                 
             db.session.commit()
             
-        return jsonify({"message": "Updated textbox in PostgreSQL"})
+        return jsonify({"message": "Message saved and textbox updated in PostgreSQL"})
         
     except Exception as e:
         db.session.rollback()
