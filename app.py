@@ -1287,34 +1287,27 @@ def get_messages():
     if not ticket_id:
         return jsonify({"error": "Ticket ID is required"}), 400
 
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    
-    # ดึงข้อความทั้งหมดสำหรับ ticket_id นั้นๆ เรียงตามเวลาจากเก่าสุดไปใหม่สุด
-    cur.execute("""
-        SELECT id, ticket_id, admin_id, sender_name, message, timestamp, is_read, is_admin_message
-        FROM messages
-        WHERE ticket_id = %s
-        ORDER BY timestamp ASC
-    """, (ticket_id,))
-    
-    messages = []
-    for row in cur.fetchall():
-        messages.append({
-            "id": row[0],
-            "ticket_id": row[1],
-            "admin_id": row[2],
-            "sender_name": row[3],
-            "message": row[4],
-            "timestamp": row[5].isoformat(),
-            "is_read": row[6],
-            "is_admin_message": row[7]
-        })
-    
-    conn.close()
-    return jsonify(messages)
+    try:
+        # ดึงข้อความทั้งหมดสำหรับ ticket_id นั้นๆ เรียงตามเวลาจากเก่าสุดไปใหม่สุด
+        messages = Message.query.filter_by(ticket_id=ticket_id).order_by(Message.timestamp.asc()).all()
+        
+        result = []
+        for message in messages:
+            result.append({
+                "id": message.id,
+                "ticket_id": message.ticket_id,
+                "admin_id": message.admin_id,
+                "sender_name": message.sender_name,
+                "message": message.message,
+                "timestamp": message.timestamp.isoformat(),
+                "is_read": message.is_read,
+                "is_admin_message": message.is_admin_message
+            })
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/messages', methods=['POST'])
 def add_message():
@@ -1371,34 +1364,28 @@ def mark_messages_read():
     if not ticket_id:
         return jsonify({"error": "Ticket ID is required"}), 400
 
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
-    )
-    cur = conn.cursor()
-    
-    # ทำเครื่องหมายว่าข้อความถูกอ่านแล้ว
-    if admin_id:
-        # ถ้ามี admin_id ให้ทำเครื่องหมายเฉพาะข้อความที่ admin นี้ยังไม่ได้อ่าน
-        cur.execute("""
-            UPDATE messages
-            SET is_read = TRUE
-            WHERE ticket_id = %s 
-            AND (admin_id IS NULL OR admin_id = %s)
-            AND is_read = FALSE
-        """, (ticket_id, admin_id))
-    else:
-        # ถ้าไม่มี admin_id ให้ทำเครื่องหมายทุกข้อความ
-        cur.execute("""
-            UPDATE messages
-            SET is_read = TRUE
-            WHERE ticket_id = %s
-            AND is_read = FALSE
-        """, (ticket_id,))
-    
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"success": True})
+    try:
+        # ทำเครื่องหมายว่าข้อความถูกอ่านแล้ว
+        if admin_id:
+            # ถ้ามี admin_id ให้ทำเครื่องหมายเฉพาะข้อความที่ admin นี้ยังไม่ได้อ่าน
+            Message.query.filter(
+                Message.ticket_id == ticket_id,
+                (Message.admin_id.is_(None) | (Message.admin_id == admin_id)),
+                Message.is_read == False
+            ).update({"is_read": True})
+        else:
+            # ถ้าไม่มี admin_id ให้ทำเครื่องหมายทุกข้อความ
+            Message.query.filter(
+                Message.ticket_id == ticket_id,
+                Message.is_read == False
+            ).update({"is_read": True})
+        
+        db.session.commit()
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/sync-tickets')
 def sync_route():
