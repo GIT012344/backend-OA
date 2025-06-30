@@ -1031,37 +1031,27 @@ def send_announcement():
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
     
-    announcement_message = data.get('message')
-
-    if not announcement_message:
+    message = data.get('message')
+    if not message:
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        # 1. ดึงรายชื่อผู้ใช้ทั้งหมดที่ต้องการส่งประกาศ using SQLAlchemy
-        tickets = Ticket.query.filter(
-            Ticket.type == 'Information',
-            Ticket.user_id.isnot(None)
-        ).all()
-
+        # Get all active users
+        users = User.query.filter_by(is_active=True).all()
         recipient_count = 0
-        full_message = f"{announcement_message}"
 
-        # 2. อัปเดต TEXTBOX และส่ง LINE Message
-        for ticket in tickets:
-            # อัปเดต TEXTBOX ใน PostgreSQL
-            ticket.textbox = full_message
-
-            # ส่ง LINE Message
-            if ticket.user_id:
-                send_announcement_message(ticket.user_id, full_message, ticket.name)
+        for user in users:
+            # Send announcement to each user
+            if send_announcement_message(user.id, message, user.name):
                 recipient_count += 1
 
-        # 3. สร้าง notification ในระบบ
+        # Create notification
         notification = Notification()
-        notification.message = f"ประกาศใหม่: {announcement_message}"
+        notification.message = f"New announcement: {message}"
+        notification.read = False
         db.session.add(notification)
-
         db.session.commit()
+
         return jsonify({
             "success": True,
             "recipient_count": recipient_count,
@@ -1284,25 +1274,27 @@ def get_data_by_date():
 @app.route('/api/messages', methods=['GET'])
 def get_messages():
     user_id = request.args.get('user_id')
+    
+    # Validate user_id
     if not user_id:
         return jsonify({"error": "User ID is required"}), 400
+        
+    if user_id.lower() == "announcement":
+        return jsonify({"error": "Cannot get messages for announcements"}), 400
 
     try:
-        # Get messages for this user, ordered by timestamp
         messages = Message.query.filter_by(user_id=user_id).order_by(Message.timestamp.asc()).all()
         
-        result = []
-        for message in messages:
-            result.append({
-                "id": message.id,
-                "user_id": message.user_id,
-                "admin_id": message.admin_id,
-                "sender_name": message.sender_name,
-                "message": message.message,
-                "timestamp": message.timestamp.isoformat(),
-                "is_read": message.is_read,
-                "is_admin_message": message.is_admin_message
-            })
+        result = [{
+            "id": msg.id,
+            "user_id": msg.user_id,
+            "admin_id": msg.admin_id,
+            "sender_name": msg.sender_name,
+            "message": msg.message,
+            "timestamp": msg.timestamp.isoformat(),
+            "is_read": msg.is_read,
+            "is_admin_message": msg.is_admin_message
+        } for msg in messages]
         
         return jsonify(result)
         
