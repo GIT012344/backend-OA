@@ -2,8 +2,6 @@ from flask import Flask, jsonify, request
 import requests
 from flask_cors import CORS 
 import psycopg2
-import gspread
-from google.oauth2.service_account import Credentials
 from datetime import datetime
 import os
 from datetime import timedelta
@@ -41,11 +39,6 @@ DB_PORT = 5432
 app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
-# Google Sheets config
-SHEET_NAME = 'Tickets'  # ชื่อ Google Sheet ที่มีข้อมูล
-WORKSHEET_NAME = 'Sheet1'  # หรือชื่อ sheet ที่มีข้อมูล
-CREDENTIALS_FILE = 'credentials.json'
 
 # Define SQLAlchemy models
 class Ticket(db.Model):
@@ -153,8 +146,6 @@ def notify_user(payload):
 
     response = requests.post(url, headers=headers, json=body)
     return response.status_code == 200
-
-
 
 def create_flex_message(payload):
     appointment_date = '-'
@@ -431,161 +422,6 @@ def create_flex_message(payload):
             }
         }
     }
-
-
-def sync_google_sheet_to_postgres():
-    try:
-        # 1. Connect to Google Sheets
-        scope = ['https://spreadsheets.google.com/feeds', 
-                'https://www.googleapis.com/auth/drive']
-        
-        if not os.path.exists(CREDENTIALS_FILE):
-            raise Exception(f"Credentials file {CREDENTIALS_FILE} not found")
-            
-        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scope)
-        client = gspread.authorize(creds)
-        
-        try:
-            sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
-            records = sheet.get_all_records()
-        except gspread.exceptions.SpreadsheetNotFound:
-            raise Exception(f"Google Sheet '{SHEET_NAME}' not found")
-        except gspread.exceptions.WorksheetNotFound:
-            raise Exception(f"Worksheet '{WORKSHEET_NAME}' not found")
-
-        # 2. Connect to PostgreSQL
-        try:
-            conn = psycopg2.connect(
-                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-                host=DB_HOST, port=DB_PORT
-            )
-            conn.autocommit = False
-            cur = conn.cursor()
-        except psycopg2.Error as e:
-            raise Exception(f"Database connection error: {str(e)}")
-
-        # ดึง ticket_id จาก Google Sheets
-        sheet_ticket_ids = [str(row['Ticket ID']) for row in records if row.get('Ticket ID')]
-        
-        # 3. ลบข้อมูลใน Postgres ที่ไม่มีใน Google Sheets
-        if sheet_ticket_ids:
-            cur.execute("""
-                DELETE FROM tickets 
-                WHERE ticket_id NOT IN %s
-                AND ticket_id IS NOT NULL
-            """, (tuple(sheet_ticket_ids),))
-        else:
-            cur.execute("DELETE FROM tickets;")
-
-        # 4. Sync (insert/update) ข้อมูลใหม่
-        textbox_updates = []
-        for row in records:
-            try:
-                ticket_id = str(row.get('Ticket ID', ''))
-                if not ticket_id:
-                    continue
-
-                # ดึงข้อมูล textbox ปัจจุบันจาก PostgreSQL
-                cur.execute("SELECT textbox FROM tickets WHERE ticket_id = %s", (ticket_id,))
-                result = cur.fetchone()
-                current_textbox = result[0] if result else None
-                
-                new_textbox = str(row.get('TEXTBOX', '')) if row.get('TEXTBOX') else None
-                
-                # ตรวจสอบว่า textbox มีการเปลี่ยนแปลงและไม่ว่างเปล่า
-                if new_textbox and new_textbox != current_textbox:
-                    # ถ้าเป็นข้อความจาก User (ไม่ใช่จาก Admin)
-                    if not new_textbox.startswith("Admin:"):
-                        user_name = str(row.get('ชื่อ', 'Unknown')) if row.get('ชื่อ') else 'Unknown'
-                        # บันทึกข้อความลงในตาราง messages
-                        cur.execute("""
-                            INSERT INTO messages (
-                                ticket_id, sender_name, message, is_admin_message
-                            ) VALUES (%s, %s, %s, %s)
-                        """, (ticket_id, user_name, new_textbox, False))
-                        
-                        # สร้าง notification
-                        message = f"New message from {user_name} for ticket {ticket_id}: {new_textbox}"
-                        cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
-                        
-                        # บันทึกการอัปเดต textbox เพื่อเคลียร์ทีหลัง
-                        textbox_updates.append({
-                            'ticket_id': ticket_id,
-                            'textbox': new_textbox
-                        })
-
-                # อัปเดตข้อมูล ticket โดยไม่เปลี่ยน textbox ถ้าไม่มีข้อมูลใหม่
-                cur.execute("""
-                    INSERT INTO tickets (
-                        ticket_id, user_id, email, name, phone,
-                        department, created_at, status, appointment,
-                        requested, report, type
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (ticket_id) DO UPDATE SET
-                        user_id = EXCLUDED.user_id,
-                        email = EXCLUDED.email,
-                        name = EXCLUDED.name,
-                        phone = EXCLUDED.phone,
-                        department = EXCLUDED.department,
-                        created_at = EXCLUDED.created_at,
-                        status = EXCLUDED.status,
-                        appointment = EXCLUDED.appointment,
-                        requested = EXCLUDED.requested,
-                        report = EXCLUDED.report,
-                        type = EXCLUDED.type
-                """, (
-                    ticket_id,
-                    row.get('User ID', ''),
-                    row.get('อีเมล', ''),
-                    row.get('ชื่อ', ''),
-                    row.get('เบอร์ติดต่อ', ''),
-                    row.get('แผนก', ''),
-                    parse_datetime(row.get('วันที่แจ้ง', '')),
-                    row.get('สถานะ', ''),
-                    row.get('Appointment', ''),
-                    row.get('Requeste', ''),
-                    row.get('Report', ''),
-                    row.get('Type', '')
-                ))
-
-            except Exception as e:
-                print(f"ERROR: Error syncing row: {row.get('Ticket ID', 'N/A')} - {e}")
-                conn.rollback()
-                raise e
-        
-        # เคลียร์ textbox ในตาราง tickets สำหรับข้อความที่ย้ายไปตาราง messages แล้ว
-        for update in textbox_updates:
-            cur.execute("""
-                UPDATE tickets 
-                SET textbox = ''
-                WHERE ticket_id = %s
-            """, (update['ticket_id'],))
-
-        # เพิ่ม notification สำหรับ ticket ใหม่
-        new_tickets = []
-        for row in records:
-            ticket_id = str(row.get('Ticket ID', ''))
-            if ticket_id:
-                cur.execute("SELECT 1 FROM tickets WHERE ticket_id = %s", (ticket_id,))
-                if not cur.fetchone():
-                    new_tickets.append(row)
-                    message = f"New ticket created: #{ticket_id} - {row.get('ชื่อ', '')} ({row.get('แผนก', '')})"
-                    cur.execute("INSERT INTO notifications (message) VALUES (%s)", (message,))
-
-        # Commit transaction
-        conn.commit()
-        conn.close()
-        return new_tickets
-        
-    except Exception as e:
-        print(f"ERROR: Error in sync_google_sheet_to_postgres: {str(e)}")
-        if 'conn' in locals() and conn:
-            try:
-                conn.rollback()
-                conn.close()
-            except:
-                pass
-        raise
 
 @app.route('/api/notifications')
 def get_notifications():
@@ -1235,9 +1071,6 @@ def send_announcement():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
-
-
-
 
 def send_announcement_message(user_id, message, recipient_name=None):
     url = "https://api.line.me/v2/bot/message/push"

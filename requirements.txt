@@ -3,9 +3,6 @@ flask-cors
 gunicorn
 requests
 psycopg2-binary
-gspread
-google-auth
-google-auth-oauthlib
 python-dotenv
 Flask-Caching
 flask-sqlalchemy
