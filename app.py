@@ -1278,26 +1278,22 @@ def get_messages():
     # Validate user_id
     if not user_id:
         return jsonify({"error": "User ID is required"}), 400
-        
     if user_id.lower() == "announcement":
         return jsonify({"error": "Cannot get messages for announcements"}), 400
 
     try:
         messages = Message.query.filter_by(user_id=user_id).order_by(Message.timestamp.asc()).all()
-        
         result = [{
             "id": msg.id,
             "user_id": msg.user_id,
             "admin_id": msg.admin_id,
-            "sender_name": msg.sender_name,
+            "sender_name": msg.sender_name or ("Admin" if msg.is_admin_message else "User"),
             "message": msg.message,
             "timestamp": msg.timestamp.isoformat(),
             "is_read": msg.is_read,
             "is_admin_message": msg.is_admin_message
         } for msg in messages]
-        
         return jsonify(result)
-        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1313,33 +1309,29 @@ def add_message():
     message = data.get('message')
     is_admin_message = data.get('is_admin_message', False)
 
-    if not all([user_id, sender_name, message]):
+    if not user_id or not sender_name or not message:
         return jsonify({"error": "Missing required fields"}), 400
 
     try:
-        # Add new message
         new_message = Message()
         new_message.user_id = user_id
         new_message.admin_id = admin_id
         new_message.sender_name = sender_name
         new_message.message = message
         new_message.is_admin_message = is_admin_message
-        
         db.session.add(new_message)
-        
-        # อัปเดต TEXTBOX ในตาราง tickets เป็นค่าว่างทันที
-        ticket = Ticket.query.get(user_id)
-        if ticket:
-            ticket.textbox = ''
-        
         db.session.commit()
-        
         return jsonify({
             "id": new_message.id,
+            "user_id": new_message.user_id,
+            "admin_id": new_message.admin_id,
+            "sender_name": new_message.sender_name or ("Admin" if new_message.is_admin_message else "User"),
+            "message": new_message.message,
             "timestamp": new_message.timestamp.isoformat(),
+            "is_read": new_message.is_read,
+            "is_admin_message": new_message.is_admin_message,
             "success": True
         })
-        
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
