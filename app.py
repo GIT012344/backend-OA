@@ -70,7 +70,7 @@ class Message(db.Model):
     __tablename__ = 'messages'
     
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.ticket_id'))
+    user_id = db.Column(db.String)
     admin_id = db.Column(db.String)
     sender_name = db.Column(db.String)
     message = db.Column(db.Text, nullable=False)
@@ -783,7 +783,7 @@ def delete_ticket():
 
     try:
         # 1. ลบข้อความที่เกี่ยวข้องก่อน
-        Message.query.filter_by(ticket_id=ticket_id).delete()
+        Message.query.filter_by(user_id=ticket_id).delete()
         
         # 2. ลบ ticket จาก PostgreSQL
         ticket = Ticket.query.get(ticket_id)
@@ -825,7 +825,7 @@ def delete_messages():
 
     try:
         # ลบข้อความทั้งหมดที่เกี่ยวข้องกับ ticket_id นี้
-        Message.query.filter_by(ticket_id=ticket_id).delete()
+        Message.query.filter_by(user_id=ticket_id).delete()
         db.session.commit()
         return jsonify({"success": True, "message": "Messages deleted successfully"})
     except Exception as e:
@@ -897,7 +897,7 @@ def refresh_messages():
 
     try:
         # ดึงข้อความล่าสุด using SQLAlchemy
-        messages = Message.query.filter_by(ticket_id=ticket_id).order_by(Message.timestamp.asc()).all()
+        messages = Message.query.filter_by(user_id=ticket_id).order_by(Message.timestamp.asc()).all()
         
         result = []
         for message in messages:
@@ -915,13 +915,13 @@ def refresh_messages():
         # ทำเครื่องหมายว่าข้อความถูกอ่านแล้ว
         if admin_id:
             Message.query.filter(
-                Message.ticket_id == ticket_id,
+                Message.user_id == ticket_id,
                 (Message.admin_id.is_(None) | (Message.admin_id == admin_id)),
                 Message.is_read == False
             ).update({"is_read": True})
         else:
             Message.query.filter(
-                Message.ticket_id == ticket_id,
+                Message.user_id == ticket_id,
                 Message.is_read == False
             ).update({"is_read": True})
         
@@ -965,7 +965,7 @@ def update_textbox():
         if current_text != new_text:
             # บันทึกข้อความลงในตาราง messages ก่อน
             new_message = Message()
-            new_message.ticket_id = ticket_id
+            new_message.user_id = ticket_id
             new_message.admin_id = admin_id
             new_message.sender_name = sender_name
             new_message.message = new_text
@@ -1283,19 +1283,19 @@ def get_data_by_date():
 
 @app.route('/api/messages', methods=['GET'])
 def get_messages():
-    ticket_id = request.args.get('ticket_id')
-    if not ticket_id:
-        return jsonify({"error": "Ticket ID is required"}), 400
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
 
     try:
-        # ดึงข้อความทั้งหมดสำหรับ ticket_id นั้นๆ เรียงตามเวลาจากเก่าสุดไปใหม่สุด
-        messages = Message.query.filter_by(ticket_id=ticket_id).order_by(Message.timestamp.asc()).all()
+        # Get messages for this user, ordered by timestamp
+        messages = Message.query.filter_by(user_id=user_id).order_by(Message.timestamp.asc()).all()
         
         result = []
         for message in messages:
             result.append({
                 "id": message.id,
-                "ticket_id": message.ticket_id,
+                "user_id": message.user_id,
                 "admin_id": message.admin_id,
                 "sender_name": message.sender_name,
                 "message": message.message,
@@ -1315,19 +1315,19 @@ def add_message():
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
     
-    ticket_id = data.get('ticket_id')
+    user_id = data.get('user_id')
     admin_id = data.get('admin_id')
     sender_name = data.get('sender_name')
     message = data.get('message')
     is_admin_message = data.get('is_admin_message', False)
 
-    if not all([ticket_id, sender_name, message]):
+    if not all([user_id, sender_name, message]):
         return jsonify({"error": "Missing required fields"}), 400
 
     try:
-        # เพิ่มข้อความใหม่ using SQLAlchemy
+        # Add new message
         new_message = Message()
-        new_message.ticket_id = ticket_id
+        new_message.user_id = user_id
         new_message.admin_id = admin_id
         new_message.sender_name = sender_name
         new_message.message = message
@@ -1336,7 +1336,7 @@ def add_message():
         db.session.add(new_message)
         
         # อัปเดต TEXTBOX ในตาราง tickets เป็นค่าว่างทันที
-        ticket = Ticket.query.get(ticket_id)
+        ticket = Ticket.query.get(user_id)
         if ticket:
             ticket.textbox = ''
         
@@ -1358,25 +1358,23 @@ def mark_messages_read():
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
     
-    ticket_id = data.get('ticket_id')
+    user_id = data.get('user_id')
     admin_id = data.get('admin_id')
 
-    if not ticket_id:
-        return jsonify({"error": "Ticket ID is required"}), 400
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
 
     try:
-        # ทำเครื่องหมายว่าข้อความถูกอ่านแล้ว
+        # Mark messages as read
         if admin_id:
-            # ถ้ามี admin_id ให้ทำเครื่องหมายเฉพาะข้อความที่ admin นี้ยังไม่ได้อ่าน
             Message.query.filter(
-                Message.ticket_id == ticket_id,
+                Message.user_id == user_id,
                 (Message.admin_id.is_(None) | (Message.admin_id == admin_id)),
                 Message.is_read == False
             ).update({"is_read": True})
         else:
-            # ถ้าไม่มี admin_id ให้ทำเครื่องหมายทุกข้อความ
             Message.query.filter(
-                Message.ticket_id == ticket_id,
+                Message.user_id == user_id,
                 Message.is_read == False
             ).update({"is_read": True})
         
