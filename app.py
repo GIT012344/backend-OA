@@ -1191,6 +1191,26 @@ def update_ticket():
             })
 
         db.session.commit()
+
+        # ส่งแจ้งเตือน LINE เฉพาะเมื่อมีการอัปเดตสถานะ (และไม่ใช่ Cancelled)
+        if 'status' in data and ticket.user_id:
+            payload = {
+                'ticket_id': ticket.ticket_id,
+                'user_id': ticket.user_id,
+                'status': ticket.status,
+                'email': ticket.email,
+                'name': ticket.name,
+                'phone': ticket.phone,
+                'department': ticket.department,
+                'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
+                'appointment': ticket.appointment,
+                'requested': ticket.requested,
+                'report': ticket.report,
+                'type': ticket.type,
+                'textbox': ticket.textbox,
+            }
+            notify_user(payload)
+
         return jsonify({
             "success": True,
             "message": "Ticket updated successfully",
