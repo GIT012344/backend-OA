@@ -154,10 +154,13 @@ def create_flex_message(payload):
             appointment_date = payload['appointment']
     status = payload.get('status', 'ไม่ระบุ')
     status_color = {
-        'Pending': '#FF9900',
-        'Completed': '#00AA00',
-        'Rejected': '#FF0000',
-        'In Progress': '#0066FF'
+        'New': '#00BFFF',           # ฟ้าอ่อน
+        'In Progress': '#0066FF',   # ฟ้าเข้ม
+        'Pending': '#FF9900',       # ส้ม
+        'Closed': '#00AA00',        # เขียว
+        'Cancelled': '#666666',     # เทาเข้ม
+        'On Hold': '#A020F0',       # ม่วง
+        'Rejected': '#FF0000',      # แดง (ถ้ามี)
     }.get(status, '#666666')
 
     return {
@@ -1153,26 +1156,46 @@ def update_ticket():
         return jsonify({"error": "No JSON data provided"}), 400
     
     ticket_id = data.get("ticket_id")
-    new_status = data.get("status")
-    new_textbox = data.get("textbox")
-
     if not ticket_id:
         return jsonify({"error": "ticket_id is required"}), 400
 
     try:
-        # Update PostgreSQL using SQLAlchemy
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
-        
-        if new_status is not None:
-            ticket.status = new_status
-        if new_textbox is not None:
-            ticket.textbox = new_textbox
-            
+
+        # รายชื่อ field ที่อนุญาตให้แก้ไข (ยกเว้น ticket_id)
+        editable_fields = [
+            'user_id', 'email', 'name', 'phone', 'department', 'created_at',
+            'status', 'appointment', 'requested', 'report', 'type', 'textbox'
+        ]
+        updated_fields = []
+        for field in editable_fields:
+            if field in data and getattr(ticket, field) != data[field]:
+                setattr(ticket, field, data[field])
+                updated_fields.append(field)
+
+        # ถ้า status ใหม่เป็น Cancelled ให้ลบ ticket และ message ที่เกี่ยวข้องทันที
+        if 'status' in data and data['status'] == 'Cancelled':
+            # ลบ message ที่เกี่ยวข้อง
+            Message.query.filter_by(user_id=ticket_id).delete()
+            db.session.delete(ticket)
+            # สร้าง notification
+            notification = Notification()
+            notification.message = f"Ticket {ticket_id} has been cancelled and deleted."
+            db.session.add(notification)
+            db.session.commit()
+            return jsonify({
+                "success": True,
+                "message": "Ticket cancelled and deleted successfully"
+            })
+
         db.session.commit()
-        return jsonify({"message": "Ticket updated in PostgreSQL"})
-        
+        return jsonify({
+            "success": True,
+            "message": "Ticket updated successfully",
+            "updated_fields": updated_fields
+        })
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
