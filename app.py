@@ -880,29 +880,14 @@ def refresh_messages():
         for message in messages:
             result.append({
                 "id": message.id,
-                "ticket_id": message.ticket_id,
+                "user_id": message.user_id,
                 "admin_id": message.admin_id,
-                "sender_name": message.sender_name,
+                "sender_type": message.sender_type,
                 "message": message.message,
-                "timestamp": message.timestamp.isoformat(),
-                "is_read": message.is_read,
-                "is_admin_message": message.is_admin_message
+                "timestamp": message.timestamp.isoformat()
             })
         
-        # ทำเครื่องหมายว่าข้อความถูกอ่านแล้ว
-        if admin_id:
-            Message.query.filter(
-                Message.user_id == ticket_id,
-                (Message.admin_id.is_(None) | (Message.admin_id == admin_id)),
-                Message.is_read == False
-            ).update({"is_read": True})
-        else:
-            Message.query.filter(
-                Message.user_id == ticket_id,
-                Message.is_read == False
-            ).update({"is_read": True})
-        
-        db.session.commit()
+        # No marking as read, just return the result
         return jsonify({"messages": result, "success": True})
         
     except Exception as e:
@@ -925,7 +910,7 @@ def update_textbox():
     new_text = data.get("textbox")
     is_announcement = data.get("is_announcement", False)
     admin_id = data.get("admin_id")
-    sender_name = data.get("sender_name", "Admin")
+    sender_type = data.get("sender_type", "Admin")
 
     if not ticket_id or new_text is None:
         return jsonify({"error": "ticket_id and text required"}), 400
@@ -944,7 +929,7 @@ def update_textbox():
             new_message = Message()
             new_message.user_id = ticket_id
             new_message.admin_id = admin_id
-            new_message.sender_name = sender_name
+            new_message.sender_type = sender_type
             new_message.message = new_text
             db.session.add(new_message)
             
