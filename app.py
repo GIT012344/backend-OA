@@ -946,7 +946,6 @@ def update_textbox():
             new_message.admin_id = admin_id
             new_message.sender_name = sender_name
             new_message.message = new_text
-            new_message.is_admin_message = True
             db.session.add(new_message)
             
             # Update textbox ในตาราง tickets
@@ -1280,7 +1279,11 @@ def send_message():
         return jsonify({"error": "user_id, sender_type, and message are required"}), 400
     if sender_type not in ['user', 'admin']:
         return jsonify({"error": "sender_type must be 'user' or 'admin'"}), 400
-    msg = Message(user_id=user_id, admin_id=admin_id, sender_type=sender_type, message=message)
+    msg = Message()
+    msg.user_id = user_id
+    msg.admin_id = admin_id
+    msg.sender_type = sender_type
+    msg.message = message
     db.session.add(msg)
     db.session.commit()
     return jsonify({
