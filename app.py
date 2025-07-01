@@ -997,14 +997,20 @@ def send_announcement():
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        # Get all active users
-        users = User.query.filter_by(is_active=True).all()
+        # ดึง user_id ที่ type == 'Information' จาก tickets
+        users = (
+            db.session.query(Ticket.user_id, Ticket.name)
+            .filter(Ticket.type == 'Information')
+            .distinct()
+            .all()
+        )
         recipient_count = 0
 
         for user in users:
-            # Send announcement to each user
-            if send_announcement_message(user.id, message, user.name):
-                recipient_count += 1
+            user_id = user.user_id
+            if user_id:
+                if send_announcement_message(user_id, message, user.name):
+                    recipient_count += 1
 
         # Create notification
         notification = Notification()
