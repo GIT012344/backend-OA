@@ -1271,6 +1271,9 @@ def send_message():
     msg.message = message
     db.session.add(msg)
     db.session.commit()
+    # ถ้าเป็น admin ส่งข้อความ ให้ push ข้อความไป LINE user ด้วย
+    if sender_type == 'admin':
+        send_textbox_message(user_id, message)
     return jsonify({
         "id": msg.id,
         "user_id": msg.user_id,
