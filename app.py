@@ -68,15 +68,12 @@ class Notification(db.Model):
 
 class Message(db.Model):
     __tablename__ = 'messages'
-    
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.String)
-    admin_id = db.Column(db.String)
-    sender_name = db.Column(db.String)
+    user_id = db.Column(db.String, nullable=False)
+    admin_id = db.Column(db.String, nullable=True)
+    sender_type = db.Column(db.String, nullable=False)  # 'user' or 'admin'
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    is_read = db.Column(db.Boolean, default=False)
-    is_admin_message = db.Column(db.Boolean, default=False)
 
 def send_textbox_message(user_id, message_text):
     url = "https://api.line.me/v2/bot/message/push"
@@ -812,26 +809,6 @@ def delete_ticket():
             "details": str(e)
         }), 500
 
-@app.route('/api/messages/delete', methods=['POST'])
-def delete_messages():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-        
-    ticket_id = data.get('ticket_id')
-
-    if not ticket_id:
-        return jsonify({"error": "Ticket ID is required"}), 400
-
-    try:
-        # ลบข้อความทั้งหมดที่เกี่ยวข้องกับ ticket_id นี้
-        Message.query.filter_by(user_id=ticket_id).delete()
-        db.session.commit()
-        return jsonify({"success": True, "message": "Messages deleted successfully"})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/auto-clear-textbox', methods=['POST'])
 def auto_clear_textbox():
     data = request.get_json()
@@ -1274,316 +1251,47 @@ def get_data_by_date():
 @app.route('/api/messages', methods=['GET'])
 def get_messages():
     user_id = request.args.get('user_id')
-    
-    # Validate user_id
     if not user_id:
-        return jsonify({"error": "User ID is required"}), 400
-    if user_id.lower() == "announcement":
-        return jsonify({"error": "Cannot get messages for announcements"}), 400
-
-    try:
-        messages = Message.query.filter_by(user_id=user_id).order_by(Message.timestamp.asc()).all()
-        result = [{
-            "id": msg.id,
-            "user_id": msg.user_id,
-            "admin_id": msg.admin_id,
-            "sender_name": msg.sender_name or ("Admin" if msg.is_admin_message else "User"),
-            "message": msg.message,
-            "timestamp": msg.timestamp.isoformat(),
-            "is_read": msg.is_read,
-            "is_admin_message": msg.is_admin_message
-        } for msg in messages]
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "user_id is required"}), 400
+    messages = Message.query.filter_by(user_id=user_id).order_by(Message.timestamp.asc()).all()
+    result = [
+        {
+            "id": m.id,
+            "user_id": m.user_id,
+            "admin_id": m.admin_id,
+            "sender_type": m.sender_type,
+            "message": m.message,
+            "timestamp": m.timestamp.isoformat()
+        }
+        for m in messages
+    ]
+    return jsonify(result)
 
 @app.route('/api/messages', methods=['POST'])
-def add_message():
+def send_message():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
-    
     user_id = data.get('user_id')
     admin_id = data.get('admin_id')
-    sender_name = data.get('sender_name')
+    sender_type = data.get('sender_type')
     message = data.get('message')
-    is_admin_message = data.get('is_admin_message', False)
-
-    if not user_id or not sender_name or not message:
-        return jsonify({"error": "Missing required fields"}), 400
-
-    try:
-        new_message = Message()
-        new_message.user_id = user_id
-        new_message.admin_id = admin_id
-        new_message.sender_name = sender_name
-        new_message.message = message
-        new_message.is_admin_message = is_admin_message
-        db.session.add(new_message)
-        db.session.commit()
-        return jsonify({
-            "id": new_message.id,
-            "user_id": new_message.user_id,
-            "admin_id": new_message.admin_id,
-            "sender_name": new_message.sender_name or ("Admin" if new_message.is_admin_message else "User"),
-            "message": new_message.message,
-            "timestamp": new_message.timestamp.isoformat(),
-            "is_read": new_message.is_read,
-            "is_admin_message": new_message.is_admin_message,
-            "success": True
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/messages/mark-read', methods=['POST'])
-def mark_messages_read():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-    
-    user_id = data.get('user_id')
-    admin_id = data.get('admin_id')
-
-    if not user_id:
-        return jsonify({"error": "User ID is required"}), 400
-
-    try:
-        # Mark messages as read
-        if admin_id:
-            Message.query.filter(
-                Message.user_id == user_id,
-                (Message.admin_id.is_(None) | (Message.admin_id == admin_id)),
-                Message.is_read == False
-            ).update({"is_read": True})
-        else:
-            Message.query.filter(
-                Message.user_id == user_id,
-                Message.is_read == False
-            ).update({"is_read": True})
-        
-        db.session.commit()
-        return jsonify({"success": True})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/sync-tickets')
-def sync_route():
-    try:
-        print("Starting PostgreSQL-only sync process...")
-        
-        # ตรวจสอบการเชื่อมต่อฐานข้อมูล
-        try:
-            conn = psycopg2.connect(
-                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-                host=DB_HOST, port=DB_PORT
-            )
-            print("Database connection successful")
-            conn.close()
-        except Exception as db_error:
-            print(f"Database connection failed: {str(db_error)}")
-            return jsonify({
-                "error": "Database connection failed",
-                "message": str(db_error)
-            }), 500
-        
-        # สร้างตาราง
-        try:
-            with app.app_context():
-                print("Creating tables...")
-                create_tickets_table()
-                print("Tables created successfully")
-        except Exception as table_error:
-            print(f"Table creation error: {str(table_error)}")
-            return jsonify({
-                "error": "Table creation failed",
-                "message": str(table_error)
-            }), 500
-        
-        # ดึงข้อมูลจากฐานข้อมูล
-        try:
-            conn = psycopg2.connect(
-                dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
-                host=DB_HOST, port=DB_PORT
-            )
-            cur = conn.cursor()
-            
-            # ตรวจสอบว่าตาราง tickets มีอยู่หรือไม่
-            cur.execute("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'tickets'
-                );
-            """)
-            result = cur.fetchone()
-            table_exists = result[0] if result else False
-            
-            if not table_exists:
-                print("Tickets table does not exist")
-                return jsonify({
-                    "error": "Tickets table not found",
-                    "message": "Please run init-users first"
-                }), 500
-            
-            cur.execute("""
-                SELECT ticket_id, email, name, phone, department, created_at, 
-                       status, appointment, requested, report, type, textbox 
-                FROM tickets
-                ORDER BY created_at DESC;
-            """)
-            rows = cur.fetchall()
-            print(f"Retrieved {len(rows)} tickets from database")
-            conn.close()
-            
-            result = [
-                {
-                    "Ticket ID": row[0],
-                    "อีเมล": row[1],
-                    "ชื่อ": row[2],
-                    "เบอร์ติดต่อ": row[3],
-                    "แผนก": row[4],
-                    "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
-                    "สถานะ": row[6],
-                    "Appointment": row[7],
-                    "Requeste": row[8],
-                    "Report": row[9],
-                    "Type": row[10],
-                    "TEXTBOX": row[11]
-                }
-                for row in rows
-            ]
-            
-            print("PostgreSQL-only sync process completed successfully")
-            return jsonify({
-                "success": True,
-                "message": "Data retrieved from PostgreSQL successfully",
-                "ticket_count": len(rows),
-                "data": result
-            })
-            
-        except Exception as query_error:
-            print(f"Query error: {str(query_error)}")
-            return jsonify({
-                "error": "Database query failed",
-                "message": str(query_error)
-            }), 500
-        
-    except Exception as e:
-        print(f"Unexpected error in sync_route: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": str(e),
-            "status": 500
-        }), 500
-
-@app.route('/api/users', methods=['GET'])
-@jwt_required()
-def get_users():
-    try:
-        users = User.query.all()
-        result = []
-        for user in users:
-            result.append({
-                "id": user.id,
-                "pin": user.pin,
-                "name": user.name,
-                "role": user.role,
-                "is_active": user.is_active
-            })
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/users', methods=['POST'])
-@jwt_required()
-def create_user():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-    
-    pin = data.get('pin')
-    name = data.get('name')
-    role = data.get('role', 'user')
-    
-    if not pin or not name:
-        return jsonify({"error": "PIN and name are required"}), 400
-    
-    # ตรวจสอบว่า PIN ซ้ำหรือไม่
-    if User.query.filter_by(pin=pin).first():
-        return jsonify({"error": "PIN already exists"}), 400
-    
-    try:
-        user = User()
-        user.pin = pin
-        user.role = role
-        user.name = name
-        db.session.add(user)
-        db.session.commit()
-        return jsonify({
-            "success": True,
-            "user": {
-                "id": user.id,
-                "pin": user.pin,
-                "name": user.name,
-                "role": user.role
-            }
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/users/<int:user_id>', methods=['PUT'])
-@jwt_required()
-def update_user(user_id):
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-    
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    try:
-        if 'name' in data:
-            user.name = data['name']
-        if 'role' in data:
-            user.role = data['role']
-        if 'is_active' in data:
-            user.is_active = data['is_active']
-        
-        db.session.commit()
-        return jsonify({
-            "success": True,
-            "user": {
-                "id": user.id,
-                "pin": user.pin,
-                "name": user.name,
-                "role": user.role,
-                "is_active": user.is_active
-            }
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/users/<int:user_id>', methods=['DELETE'])
-@jwt_required()
-def delete_user(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    try:
-        db.session.delete(user)
-        db.session.commit()
-        return jsonify({"success": True, "message": "User deleted successfully"})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+    if not user_id or not sender_type or not message:
+        return jsonify({"error": "user_id, sender_type, and message are required"}), 400
+    if sender_type not in ['user', 'admin']:
+        return jsonify({"error": "sender_type must be 'user' or 'admin'"}), 400
+    msg = Message(user_id=user_id, admin_id=admin_id, sender_type=sender_type, message=message)
+    db.session.add(msg)
+    db.session.commit()
+    return jsonify({
+        "id": msg.id,
+        "user_id": msg.user_id,
+        "admin_id": msg.admin_id,
+        "sender_type": msg.sender_type,
+        "message": msg.message,
+        "timestamp": msg.timestamp.isoformat(),
+        "success": True
+    })
 
 @app.route('/api/status')
 def system_status():
