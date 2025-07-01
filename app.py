@@ -1269,6 +1269,8 @@ def send_message():
     msg.admin_id = admin_id
     msg.sender_type = sender_type
     msg.message = message
+    # กำหนด timestamp เป็นเวลาปัจจุบัน (UTC) เสมอ
+    msg.timestamp = datetime.utcnow()
     db.session.add(msg)
     db.session.commit()
     # ถ้าเป็น admin ส่งข้อความ ให้ push ข้อความไป LINE user ด้วย
@@ -1609,6 +1611,22 @@ def get_chat_users():
         for user in users if user.user_id
     ]
     return jsonify(result)
+
+@app.route('/api/messages/delete', methods=['POST', 'OPTIONS'])
+def delete_chat_history():
+    if request.method == 'OPTIONS':
+        return '', 200
+    data = request.get_json()
+    if not data or not data.get('user_id'):
+        return jsonify({"error": "user_id is required"}), 400
+    user_id = data['user_id']
+    try:
+        Message.query.filter_by(user_id=user_id).delete()
+        db.session.commit()
+        return jsonify({"success": True, "message": "Messages deleted successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():
