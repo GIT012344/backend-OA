@@ -1601,6 +1601,24 @@ def sync_simple():
             "message": str(e)
         }), 500
 
+@app.route('/api/chat-users', methods=['GET'])
+def get_chat_users():
+    # ดึงผู้ใช้ที่มี type == 'Information' จากตาราง tickets
+    users = (
+        db.session.query(Ticket.user_id, Ticket.name)
+        .filter(Ticket.type == 'Information')
+        .distinct()
+        .all()
+    )
+    result = [
+        {
+            'user_id': user.user_id,
+            'name': user.name
+        }
+        for user in users if user.user_id
+    ]
+    return jsonify(result)
+
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
