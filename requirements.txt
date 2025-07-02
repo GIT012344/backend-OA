@@ -9,4 +9,5 @@ flask-sqlalchemy
 flask-jwt-extended
 bcrypt
 eventlet
+python-dateutil
 
