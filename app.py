@@ -13,6 +13,7 @@ from flask_jwt_extended import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
+from dateutil import parser
 
 LINE_ACCESS_TOKEN = "0C9ZwOVQ7BOY9dLLfvEqAP+RhpIXmlpcuHf4fgJ184c0nvKzc5S+rKAyjh7yDqadGK1VNxe36n+nswrYaDSLCKOGmhuXjrsRgspH1RF4hGWdgOrrMlBhGnYQjxB9jHDSXVHO5HYkjLJdWOarG8PXKQdB04t89/1O/w1cDnyilFU="
 
@@ -53,6 +54,7 @@ class Ticket(db.Model):
     created_at = db.Column(db.DateTime)
     status = db.Column(db.String)
     appointment = db.Column(db.String)
+    appointment_datetime = db.Column(db.DateTime)
     requested = db.Column(db.String)
     report = db.Column(db.String)
     type = db.Column(db.String)
@@ -695,6 +697,7 @@ def get_data():
                 "วันที่แจ้ง": ticket.created_at.isoformat() if ticket.created_at else "",
                 "สถานะ": ticket.status,
                 "Appointment": ticket.appointment,
+                "Appointment Datetime": ticket.appointment_datetime.isoformat() if ticket.appointment_datetime else None,
                 "Requeste": ticket.requested,
                 "Report": ticket.report,
                 "Type": ticket.type
@@ -1081,7 +1084,7 @@ def send_announcement_message(user_id, message, recipient_name=None):
                             },
                             {
                                 "type": "text",
-                                "text": "นี่คือข้อความประกาศจากระบบ กรุณาอ่านให้ละเอียด",
+                                "text": "นี่คือข้อความประกาศจากระบบ",
                                 "size": "sm",
                                 "color": "#888888",
                                 "margin": "md",
@@ -1167,13 +1170,20 @@ def update_ticket():
         # รายชื่อ field ที่อนุญาตให้แก้ไข (ยกเว้น ticket_id)
         editable_fields = [
             'user_id', 'email', 'name', 'phone', 'department', 'created_at',
-            'status', 'appointment', 'requested', 'report', 'type', 'textbox'
+            'status', 'appointment', 'appointment_datetime', 'requested', 'report', 'type', 'textbox'
         ]
         updated_fields = []
         for field in editable_fields:
-            if field in data and getattr(ticket, field) != data[field]:
-                setattr(ticket, field, data[field])
-                updated_fields.append(field)
+            if field in data:
+                # appointment_datetime ต้องแปลงเป็น datetime object
+                if field == 'appointment_datetime' and data[field]:
+                    new_dt = parser.parse(data[field]) if isinstance(data[field], str) else data[field]
+                    if getattr(ticket, field) != new_dt:
+                        setattr(ticket, field, new_dt)
+                        updated_fields.append(field)
+                elif getattr(ticket, field) != data[field]:
+                    setattr(ticket, field, data[field])
+                    updated_fields.append(field)
 
         # ถ้า status ใหม่เป็น Cancelled ให้ลบ ticket และ message ที่เกี่ยวข้องทันที
         if 'status' in data and data['status'] == 'Cancelled':
@@ -1204,6 +1214,7 @@ def update_ticket():
                 'department': ticket.department,
                 'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
                 'appointment': ticket.appointment,
+                'appointment_datetime': ticket.appointment_datetime.isoformat() if ticket.appointment_datetime else None,
                 'requested': ticket.requested,
                 'report': ticket.report,
                 'type': ticket.type,
