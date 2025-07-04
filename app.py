@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 import requests
 from flask_cors import CORS 
 import psycopg2
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import os
 from datetime import timedelta
 from flask_caching import Cache
@@ -13,9 +13,8 @@ from flask_jwt_extended import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
-from dateutil import parser
 
-LINE_ACCESS_TOKEN = "0C9ZwOVQ7BOY9dLLfvEqAP+RhpIXmlpcuHf4fgJ184c0nvKzc5S+rKAyjh7yDqadGK1VNxe36n+nswrYaDSLCKOGmhuXjrsRgspH1RF4hGWdgOrrMlBhGnYQjxB9jHDSXVHO5HYkjLJdWOarG8PXKQdB04t89/1O/w1cDnyilFU="
+LINE_ACCESS_TOKEN = "SaXxPgiqWnhbTbwQRoJDnvALTrp+ymslDXHUUo/+Tg1VeqzyGZu7iATjq0EiMYiSGAYKmiuMntQTaOuet4VUiz349QnmJXrKrYWR5k+PDDM1QRebmq5N2Z0kWsmDNBa+3EKmFQUAtuq9SYnXp97+ywdB04t89/1O/w1cDnyilFU="
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
@@ -54,7 +53,6 @@ class Ticket(db.Model):
     created_at = db.Column(db.DateTime)
     status = db.Column(db.String)
     appointment = db.Column(db.String)
-    appointment_datetime = db.Column(db.DateTime)
     requested = db.Column(db.String)
     report = db.Column(db.String)
     type = db.Column(db.String)
@@ -67,6 +65,21 @@ class Notification(db.Model):
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     read = db.Column(db.Boolean, default=False)
+    
+    def get_thai_time(self):
+        # Convert stored UTC time to Thai time when retrieving
+        if self.timestamp:
+            return self.timestamp.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=7)))
+        return None
+        
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'message': self.message,
+            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
+            'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None,
+            'read': self.read
+        }
 
 class Message(db.Model):
     __tablename__ = 'messages'
@@ -76,6 +89,68 @@ class Message(db.Model):
     sender_type = db.Column(db.String, nullable=False)  # 'user' or 'admin'
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def get_thai_time(self):
+        # Convert stored UTC time to Thai time when retrieving
+        if self.timestamp:
+            return self.timestamp.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=7)))
+        return None
+        
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'admin_id': self.admin_id,
+            'sender_type': self.sender_type,
+            'message': self.message,
+            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
+            'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None
+        }
+
+class TicketStatusLog(db.Model):
+    __tablename__ = 'ticket_status_logs'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    ticket_id = db.Column(db.String, db.ForeignKey('tickets.ticket_id'), nullable=False)
+    old_status = db.Column(db.String, nullable=False)
+    new_status = db.Column(db.String, nullable=False)
+    changed_by = db.Column(db.String, nullable=False)
+    changed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    def __init__(self, **kwargs):
+        # Convert any provided datetime to UTC before saving
+        if 'changed_at' in kwargs and kwargs['changed_at']:
+            if kwargs['changed_at'].tzinfo is not None:
+                kwargs['changed_at'] = kwargs['changed_at'].astimezone(timezone.utc).replace(tzinfo=None)
+        super(TicketStatusLog, self).__init__(**kwargs)
+        
+    def get_thai_time(self):
+        # Convert stored UTC time to Thai time when retrieving
+        if self.changed_at:
+            return self.changed_at.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=7)))
+        return None
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticket_id': self.ticket_id,
+            'old_status': self.old_status,
+            'new_status': self.new_status,
+            'changed_by': self.changed_by,
+            'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
+            'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None
+        }
+
+class User(db.Model):
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    pin = db.Column(db.String(10), unique=True, nullable=False)  # รหัส PIN
+    role = db.Column(db.String(20), default='user')  # 'user' หรือ 'admin'
+    name = db.Column(db.String(100), nullable=False)  # ชื่อผู้ใช้
+    is_active = db.Column(db.Boolean, default=True)  # สถานะการใช้งาน
+
+    def check_pin(self, pin):
+        return self.pin == pin and self.is_active
 
 def send_textbox_message(user_id, message_text):
     url = "https://api.line.me/v2/bot/message/push"
@@ -487,19 +562,6 @@ def parse_datetime(date_str):
     except Exception:
         return None
 
-class User(db.Model):
-    __tablename__ = 'users'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    pin = db.Column(db.String(10), unique=True, nullable=False)  # รหัส PIN
-    role = db.Column(db.String(20), default='user')  # 'user' หรือ 'admin'
-    name = db.Column(db.String(100), nullable=False)  # ชื่อผู้ใช้
-    is_active = db.Column(db.Boolean, default=True)  # สถานะการใช้งาน
-
-    def check_pin(self, pin):
-        return self.pin == pin and self.is_active
-
-# สร้างตาราง users
 def create_tables():
     db.create_all()
     
@@ -697,7 +759,6 @@ def get_data():
                 "วันที่แจ้ง": ticket.created_at.isoformat() if ticket.created_at else "",
                 "สถานะ": ticket.status,
                 "Appointment": ticket.appointment,
-                "Appointment Datetime": ticket.appointment_datetime.isoformat() if ticket.appointment_datetime else None,
                 "Requeste": ticket.requested,
                 "Report": ticket.report,
                 "Type": ticket.type
@@ -713,6 +774,31 @@ def get_data():
             "error": "Internal server error",
             "message": str(e)
         }), 500
+
+# ---------- New endpoint for dashboard appointments ----------
+@app.route('/api/appointments')
+@cache.cached(timeout=60)
+def get_appointments():
+    """Return tickets where name, appointment and requested are all present."""
+    try:
+        tickets = Ticket.query.filter(
+            Ticket.name.isnot(None), Ticket.name != '',
+            Ticket.appointment.isnot(None), Ticket.appointment != '',
+            Ticket.requested.isnot(None), Ticket.requested != ''
+        ).order_by(Ticket.created_at.desc()).limit(1000).all()
+
+        result = [
+            {
+                "name": ticket.name,
+                "appointment": ticket.appointment,
+                "requested": ticket.requested
+            }
+            for ticket in tickets
+        ]
+        return jsonify(result)
+    except Exception as e:
+        print(f"ERROR: get_appointments: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/update-status', methods=['POST'])
 def update_status():
@@ -738,12 +824,35 @@ def update_status():
         if current_status != new_status:
             # Update status
             ticket.status = new_status
-            
+
+            # Determine who performed the change (either supplied in payload or from JWT token)
+            actor = data.get("changed_by")
+            if not actor:
+                try:
+                    current_user = get_jwt_identity()  # may fail if no valid JWT context
+                    if isinstance(current_user, dict):
+                        actor = current_user.get("name") or current_user.get("pin")
+                    else:
+                        actor = str(current_user)
+                except Exception:
+                    actor = "admin"
+
+            # Create a log entry for this status change
+            log_entry = TicketStatusLog(
+                ticket_id=ticket.ticket_id,
+                old_status=current_status,
+                new_status=new_status,
+                changed_by=actor,
+                changed_at=datetime.utcnow()
+            )
+            db.session.add(log_entry)
+
             # Create notification
             notification = Notification()
             notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
             db.session.add(notification)
-            
+
+            # Commit all changes in a single transaction
             db.session.commit()
             
             # Send LINE notification if user_id exists
@@ -785,7 +894,7 @@ def delete_ticket():
         return jsonify({"error": "Ticket ID is required"}), 400
 
     try:
-        # 1. ลบข้อความที่เกี่ยวข้องก่อน
+        # 1. ลบข้อความที่เกี่ยวข้อง
         Message.query.filter_by(user_id=ticket_id).delete()
         
         # 2. ลบ ticket จาก PostgreSQL
@@ -1084,7 +1193,7 @@ def send_announcement_message(user_id, message, recipient_name=None):
                             },
                             {
                                 "type": "text",
-                                "text": "นี่คือข้อความประกาศจากระบบ",
+                                "text": "นี่คือข้อความประกาศจากระบบ กรุณาอ่านให้ละเอียด",
                                 "size": "sm",
                                 "color": "#888888",
                                 "margin": "md",
@@ -1167,23 +1276,47 @@ def update_ticket():
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
 
+        # เก็บสถานะเดิมไว้เพื่อตรวจสอบหลังอัปเดต
+        previous_status = ticket.status
+
         # รายชื่อ field ที่อนุญาตให้แก้ไข (ยกเว้น ticket_id)
         editable_fields = [
             'user_id', 'email', 'name', 'phone', 'department', 'created_at',
-            'status', 'appointment', 'appointment_datetime', 'requested', 'report', 'type', 'textbox'
+            'status', 'appointment', 'requested', 'report', 'type', 'textbox'
         ]
         updated_fields = []
         for field in editable_fields:
-            if field in data:
-                # appointment_datetime ต้องแปลงเป็น datetime object
-                if field == 'appointment_datetime' and data[field]:
-                    new_dt = parser.parse(data[field]) if isinstance(data[field], str) else data[field]
-                    if getattr(ticket, field) != new_dt:
-                        setattr(ticket, field, new_dt)
-                        updated_fields.append(field)
-                elif getattr(ticket, field) != data[field]:
-                    setattr(ticket, field, data[field])
-                    updated_fields.append(field)
+            if field in data and getattr(ticket, field) != data[field]:
+                setattr(ticket, field, data[field])
+                updated_fields.append(field)
+
+        # หากสถานะมีการเปลี่ยนแปลง (ไม่นับ Cancelled ที่จะลบ)
+        if 'status' in updated_fields and ticket.status != previous_status and data.get('status') != 'Cancelled':
+            # หาผู้กระทำ
+            actor = data.get('changed_by')
+            if not actor:
+                try:
+                    current_user = get_jwt_identity()
+                    if isinstance(current_user, dict):
+                        actor = current_user.get('name') or current_user.get('pin')
+                    else:
+                        actor = str(current_user)
+                except Exception:
+                    actor = 'admin'
+
+            # บันทึก log การเปลี่ยนสถานะ
+            log_entry = TicketStatusLog(
+                ticket_id=ticket.ticket_id,
+                old_status=previous_status,
+                new_status=ticket.status,
+                changed_by=actor,
+                changed_at=datetime.utcnow()
+            )
+            db.session.add(log_entry)
+
+            # สร้าง Notification ภายในระบบ
+            notification = Notification(message=f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}")
+            db.session.add(notification)
 
         # ถ้า status ใหม่เป็น Cancelled ให้ลบ ticket และ message ที่เกี่ยวข้องทันที
         if 'status' in data and data['status'] == 'Cancelled':
@@ -1214,7 +1347,6 @@ def update_ticket():
                 'department': ticket.department,
                 'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
                 'appointment': ticket.appointment,
-                'appointment_datetime': ticket.appointment_datetime.isoformat() if ticket.appointment_datetime else None,
                 'requested': ticket.requested,
                 'report': ticket.report,
                 'type': ticket.type,
@@ -1688,7 +1820,72 @@ def delete_chat_history():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# --- API: Log Status Change ---
+from sqlalchemy import Index
+
+@app.route('/api/log-status-change', methods=['POST'])
+def log_status_change():
+    data = request.get_json()
+    required_fields = ['ticket_id', 'old_status', 'new_status', 'changed_by', 'changed_at']
+    missing = [f for f in required_fields if not data or not data.get(f)]
+    if missing:
+        return jsonify({'error': f'Missing fields: {", ".join(missing)}'}), 400
+    if data['old_status'] == data['new_status']:
+        return jsonify({'error': 'new_status must be different from old_status'}), 400
+    # Validate ticket exists
+    ticket = Ticket.query.get(data['ticket_id'])
+    if not ticket:
+        return jsonify({'error': 'Ticket not found'}), 404
+    try:
+        # Parse timestamp
+        ts = data['changed_at']
+        if isinstance(ts, str):
+            try:
+                # Accept ISO8601 with or without 'Z' UTC designator
+                if ts.endswith('Z'):
+                    ts = ts[:-1] + '+00:00'  # convert Z to +00:00 for fromisoformat
+                dt = datetime.fromisoformat(ts)
+            except Exception:
+                return jsonify({'error': 'Invalid timestamp format, must be ISO8601'}), 400
+        else:
+            return jsonify({'error': 'changed_at must be string'}), 400
+
+        log = TicketStatusLog(
+            ticket_id=data['ticket_id'],
+            old_status=data['old_status'],
+            new_status=data['new_status'],
+            changed_by=data['changed_by'],
+            changed_at=dt
+        )
+        db.session.add(log)
+        db.session.commit()
+        return jsonify({'success': True}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/log-status-change', methods=['GET'])
+def get_status_logs():
+    ticket_id = request.args.get('ticket_id')
+    if not ticket_id:
+        return jsonify({'error': 'ticket_id is required'}), 400
+    logs = TicketStatusLog.query.filter_by(ticket_id=ticket_id).order_by(TicketStatusLog.changed_at.asc()).all()
+    return jsonify([l.to_dict() for l in logs])
+
+# Create index for ticket_id, change_timestamp for performance (if not exists)
+Index('idx_ticket_status_logs_ticket_id_changed_at', TicketStatusLog.ticket_id, TicketStatusLog.changed_at)
+
+from sqlalchemy import inspect
+
+def create_ticket_status_logs_table():
+    # For manual migration support
+    with app.app_context():
+        inspector = inspect(db.engine)
+        if not inspector.has_table('ticket_status_logs'):
+            db.create_all()
+
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
+        create_ticket_status_logs_table()
     app.run(host='0.0.0.0', port=5001, debug=False)
