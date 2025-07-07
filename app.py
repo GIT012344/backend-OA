@@ -855,12 +855,12 @@ def update_status():
                 changed_at=datetime.utcnow()
             )
             db.session.add(log_entry)
-            
+
             # Create notification
             notification = Notification()
             notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
             db.session.add(notification)
-            
+
             # Commit all changes in a single transaction
             db.session.commit()
             
@@ -1286,7 +1286,7 @@ def update_ticket():
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
-        
+
         # เก็บสถานะเดิมไว้เพื่อตรวจสอบหลังอัปเดต
         previous_status = ticket.status
 
@@ -1304,17 +1304,23 @@ def update_ticket():
                 setattr(ticket, field, data[field])
                 updated_fields.append(field)
 
-        # ---------------- Specific business rules for SERVICE / HELPDESK ----------------
-        # Determine effective values (use existing ticket values when not provided)
-        type_val = data.get('type') or ticket.type
-        group_val = data.get('group')  # may be None
-        subgroup_val = data.get('subgroup')  # may be None
+        # ---------------- Specific business rules for Service / Helpdesk ----------------
+        # Normalise the type value (case-insensitive) and map to canonical Title-case for storage
+        raw_type_val = (data.get('type') or ticket.type or '').strip()
+        type_upper = raw_type_val.upper()
+        canonical_type = None  # Will be 'Service' / 'Helpdesk' when recognised
+        if type_upper == 'SERVICE':
+            canonical_type = 'Service'
+        elif type_upper == 'HELPDESK':
+            canonical_type = 'Helpdesk'
 
-        # Process only if we have a valid type after fallback
-        if type_val in ["SERVICE", "HELPDESK"]:
-            # Validate type field
-            if type_val not in ("SERVICE", "HELPDESK"):
-                return jsonify({"error": "Invalid type. Must be SERVICE or HELPDESK"}), 400
+        # Take provided group/subgroup values (may be None)
+        group_val = data.get('group')
+        subgroup_val = data.get('subgroup')
+
+        # Process only for recognised ticket types
+        if canonical_type:
+            # Example mappings – replace with the organisation's real mappings as needed
 
             # Example mappings – replace with the organisation's real mappings as needed
             # Define allowed SERVICE groups here; leave empty set to disable strict check
@@ -1322,29 +1328,35 @@ def update_ticket():
             # Define allowed HELPDESK group->subgroup mapping here; leave empty dict to disable strict check
             HELPDESK_GROUPS: dict[str, set[str]] = {}
 
-            if type_val == "SERVICE":
-                # Fallback to existing requested value when group not provided
+            if type_upper == 'SERVICE':
+                # Determine current group and subgroup (SERVICE keeps group in `requested`)
                 group_effective = group_val or ticket.requested
-                # SERVICE must have a valid group and will clear report/subgroup
-                # Require group only if caller is trying to change it. If neither new group provided nor existing value present, keep as-is without error.
-                if group_val is not None and not group_effective:
-                    return jsonify({"error": "group is required for SERVICE type"}), 400
+                subgroup_effective = subgroup_val or ticket.subgroup
+
+                # Require both group and subgroup if the caller is explicitly trying to modify them
+                if (group_val is not None and not group_effective) or (subgroup_val is not None and not subgroup_effective):
+                    return jsonify({"error": "group and subgroup are required for SERVICE type"}), 400
+
                 if SERVICE_GROUPS and group_effective not in SERVICE_GROUPS:
                     return jsonify({"error": "Invalid group for SERVICE type"}), 400
 
+                # Update group (stored in requested column)
                 if group_val is not None and ticket.requested != group_val:
                     ticket.requested = group_val
                     if 'requested' not in updated_fields:
                         updated_fields.append('requested')
-                # Clear report & subgroup
+
+                # Update subgroup (stored in dedicated column)
+                if subgroup_val is not None and ticket.subgroup != subgroup_val:
+                    ticket.subgroup = subgroup_val
+                    if 'subgroup' not in updated_fields:
+                        updated_fields.append('subgroup')
+
+                # Clear report column (not used for SERVICE)
                 if ticket.report is not None:
                     ticket.report = None
                     if 'report' not in updated_fields:
                         updated_fields.append('report')
-                if ticket.subgroup is not None:
-                    ticket.subgroup = None
-                    if 'subgroup' not in updated_fields:
-                        updated_fields.append('subgroup')
 
             else:  # HELPDESK
                 # HELPDESK requires both group and subgroup and clears requested
@@ -1370,9 +1382,9 @@ def update_ticket():
                     if 'subgroup' not in updated_fields:
                         updated_fields.append('subgroup')
 
-            # Finally update the type field itself if changed
-            if ticket.type != type_val:
-                ticket.type = type_val
+            # Finally update the type field itself if changed to canonical value
+            if canonical_type and ticket.type != canonical_type:
+                ticket.type = canonical_type
                 if 'type' not in updated_fields:
                     updated_fields.append('type')
 
@@ -1427,8 +1439,8 @@ def update_ticket():
         except Exception:
             pass  # ไม่ขัดขวาง flow หลัก หากล้าง cache ล้มเหลว
 
-        # ส่งแจ้งเตือน LINE เฉพาะเมื่อมีการอัปเดตสถานะ (และไม่ใช่ Cancelled) และมี user_id
-        if 'status' in data and ticket.user_id and ticket.status != previous_status:
+        # ส่งแจ้งเตือน LINE เฉพาะเมื่อสถานะมีการเปลี่ยนแปลงจริง (ไม่ใช่ Cancelled) และ ticket มี user_id
+        if 'status' in updated_fields and ticket.user_id and ticket.status != previous_status and ticket.status != 'Cancelled':
             payload = {
                 'ticket_id': ticket.ticket_id,
                 'user_id': ticket.user_id,
