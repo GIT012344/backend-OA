@@ -1840,7 +1840,8 @@ from sqlalchemy import Index
 @app.route('/api/log-status-change', methods=['POST'])
 def log_status_change():
     data = request.get_json()
-    required_fields = ['ticket_id', 'old_status', 'new_status', 'changed_by', 'changed_at']
+    print("DEBUG /api/log-status-change payload:", data)  # log ข้อมูลที่รับมา
+    required_fields = ['ticket_id', 'old_status', 'new_status', 'changed_by']
     missing = [f for f in required_fields if not data or not data.get(f)]
     if missing:
         return jsonify({'error': f'Missing fields: {", ".join(missing)}'}), 400
@@ -1852,8 +1853,10 @@ def log_status_change():
         return jsonify({'error': 'Ticket not found'}), 404
     try:
         # Parse timestamp
-        ts = data['changed_at']
-        if isinstance(ts, str):
+        ts = data.get('changed_at')
+        if ts is None:
+            dt = datetime.utcnow()
+        elif isinstance(ts, str):
             try:
                 # Accept ISO8601 with or without 'Z' UTC designator
                 if ts.endswith('Z'):
@@ -1869,7 +1872,9 @@ def log_status_change():
             old_status=data['old_status'],
             new_status=data['new_status'],
             changed_by=data['changed_by'],
-            changed_at=dt
+            changed_at=dt,
+            remarks=data.get('remarks', None),
+            internal_notes=data.get('internal_notes', None)
         )
         db.session.add(log)
         db.session.commit()
