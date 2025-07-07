@@ -79,7 +79,7 @@ class Notification(db.Model):
         return {
             'id': self.id,
             'message': self.message,
-            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
+            'timestamp': self.get_thai_time().isoformat() if self.get_thai_time() else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None,
             'read': self.read
         }
@@ -106,7 +106,7 @@ class Message(db.Model):
             'admin_id': self.admin_id,
             'sender_type': self.sender_type,
             'message': self.message,
-            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
+            'timestamp': self.get_thai_time().isoformat() if self.get_thai_time() else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None
         }
 
@@ -141,7 +141,7 @@ class TicketStatusLog(db.Model):
             'old_status': self.old_status,
             'new_status': self.new_status,
             'changed_by': self.changed_by,
-            'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
+            'changed_at': self.get_thai_time().isoformat() if self.get_thai_time() else None,
             'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None,
             'remarks': self.remarks,
             'internal_notes': self.internal_notes
@@ -1407,7 +1407,8 @@ def update_ticket():
             db.session.add(log_entry)
 
             # สร้าง Notification ภายในระบบ
-            notification = Notification(message=f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}")
+            notification = Notification()
+            notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}"
             db.session.add(notification)
 
         # ถ้า status ใหม่เป็น Cancelled ให้ลบ ticket และ message ที่เกี่ยวข้องทันที
