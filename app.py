@@ -57,9 +57,7 @@ class Ticket(db.Model):
     report = db.Column(db.String)
     type = db.Column(db.String)
     textbox = db.Column(db.String)
-    remarks = db.Column(db.Text)  # หมายเหตุสำหรับลูกค้า
-    internal_notes = db.Column(db.Text)  # หมายเหตุภายใน
-
+    subgroup = db.Column(db.String)
 class Notification(db.Model):
     __tablename__ = 'notifications'
     
@@ -75,11 +73,10 @@ class Notification(db.Model):
         return None
         
     def to_dict(self):
-        thai_time = self.get_thai_time()
         return {
             'id': self.id,
             'message': self.message,
-            'timestamp': thai_time.isoformat() if thai_time else None,
+            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None,
             'read': self.read
         }
@@ -100,14 +97,13 @@ class Message(db.Model):
         return None
         
     def to_dict(self):
-        thai_time = self.get_thai_time()
         return {
             'id': self.id,
             'user_id': self.user_id,
             'admin_id': self.admin_id,
             'sender_type': self.sender_type,
             'message': self.message,
-            'timestamp': thai_time.isoformat() if thai_time else None,
+            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None
         }
 
@@ -119,8 +115,6 @@ class TicketStatusLog(db.Model):
     new_status = db.Column(db.String, nullable=False)
     changed_by = db.Column(db.String, nullable=False)
     changed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    remarks = db.Column(db.Text)  # เพิ่มหมายเหตุ
-    internal_notes = db.Column(db.Text)  # เพิ่มหมายเหตุภายใน
     
     def __init__(self, **kwargs):
         # Convert any provided datetime to UTC before saving
@@ -136,17 +130,14 @@ class TicketStatusLog(db.Model):
         return None
     
     def to_dict(self):
-        thai_time = self.get_thai_time()
         return {
             'id': self.id,
             'ticket_id': self.ticket_id,
             'old_status': self.old_status,
             'new_status': self.new_status,
             'changed_by': self.changed_by,
-            'changed_at': thai_time.isoformat() if thai_time else None,
-            'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None,
-            'remarks': self.remarks,
-            'internal_notes': self.internal_notes
+            'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
+            'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None
         }
 
 class User(db.Model):
@@ -768,9 +759,17 @@ def get_data():
                 "วันที่แจ้ง": ticket.created_at.isoformat() if ticket.created_at else "",
                 "สถานะ": ticket.status,
                 "Appointment": ticket.appointment,
-                "Requeste": ticket.requested,
+                "Requested": ticket.requested,
                 "Report": ticket.report,
-                "Type": ticket.type
+                "Type": ticket.type,
+                # Determine effective group from requested/report, ignore literal "None"
+                # compute effective group and expose in common key variants
+                **(lambda eg: {"Group": eg, "group": eg, "GROUP": eg})(
+                    ticket.requested if (ticket.requested and str(ticket.requested).lower() != "none") else (
+                        ticket.report if (ticket.report and str(ticket.report).lower() != "none") else None
+                    )
+                ),
+                "Subgroup": ticket.subgroup
             }
             for ticket in tickets
         ]
@@ -817,31 +816,29 @@ def update_status():
         
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
-    remarks = data.get("remarks", "")
-    internal_notes = data.get("internal_notes", "")
 
     if not ticket_id or not new_status:
         return jsonify({"error": "ticket_id and status required"}), 400
 
     try:
+        # Update PostgreSQL using SQLAlchemy
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
             
         current_status = ticket.status
 
+        # Only proceed if status is actually changing
         if current_status != new_status:
+            # Update status
             ticket.status = new_status
-            # Add remarks if provided
-            if remarks:
-                ticket.remarks = remarks
-            if internal_notes:
-                ticket.internal_notes = internal_notes
+            ticket.subgroup = data.get('subgroup', ticket.subgroup)
 
+            # Determine who performed the change (either supplied in payload or from JWT token)
             actor = data.get("changed_by")
             if not actor:
                 try:
-                    current_user = get_jwt_identity()
+                    current_user = get_jwt_identity()  # may fail if no valid JWT context
                     if isinstance(current_user, dict):
                         actor = current_user.get("name") or current_user.get("pin")
                     else:
@@ -849,25 +846,25 @@ def update_status():
                 except Exception:
                     actor = "admin"
 
+            # Create a log entry for this status change
             log_entry = TicketStatusLog(
                 ticket_id=ticket.ticket_id,
                 old_status=current_status,
                 new_status=new_status,
                 changed_by=actor,
-                changed_at=datetime.utcnow(),
-                remarks=remarks,
-                internal_notes=internal_notes
+                changed_at=datetime.utcnow()
             )
             db.session.add(log_entry)
 
+            # Create notification
             notification = Notification()
             notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
-            if remarks:
-                notification.message += f"\nRemarks: {remarks}"
             db.session.add(notification)
 
+            # Commit all changes in a single transaction
             db.session.commit()
             
+            # Send LINE notification if user_id exists
             if ticket.user_id:
                 payload = {
                     'ticket_id': ticket.ticket_id,
@@ -883,11 +880,10 @@ def update_status():
                     'report': ticket.report,
                     'type': ticket.type,
                     'textbox': ticket.textbox,
-                    'remarks': remarks
                 }
                 notify_user(payload)
                     
-            return jsonify({"message": "Status updated successfully", "remarks": remarks})
+            return jsonify({"message": "Status updated in PostgreSQL"})
         else:
             return jsonify({"message": "Status unchanged"})
             
@@ -1038,7 +1034,8 @@ def update_textbox():
     new_text = data.get("textbox")
     is_announcement = data.get("is_announcement", False)
     admin_id = data.get("admin_id")
-    sender_type = data.get("sender_type", "Admin")
+    sender_type = data.get("sender_type", "Admin"),
+    
 
     if not ticket_id or new_text is None:
         return jsonify({"error": "ticket_id and text required"}), 400
@@ -1283,7 +1280,8 @@ def update_ticket():
     ticket_id = data.get("ticket_id")
     if not ticket_id:
         return jsonify({"error": "ticket_id is required"}), 400
-
+    # This check is redundant since we've added 'subgroup' to editable_fields
+    # and it will be handled in the loop below
     try:
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
@@ -1295,13 +1293,83 @@ def update_ticket():
         # รายชื่อ field ที่อนุญาตให้แก้ไข (ยกเว้น ticket_id)
         editable_fields = [
             'user_id', 'email', 'name', 'phone', 'department', 'created_at',
-            'status', 'appointment', 'requested', 'report', 'type', 'textbox'
+            'status', 'appointment', 'requested', 'report', 'type', 'textbox', 'subgroup'
         ]
         updated_fields = []
         for field in editable_fields:
             if field in data and getattr(ticket, field) != data[field]:
                 setattr(ticket, field, data[field])
                 updated_fields.append(field)
+
+        # ---------------- Specific business rules for SERVICE / HELPDESK ----------------
+        # Determine effective values (use existing ticket values when not provided)
+        type_val = data.get('type') or ticket.type
+        group_val = data.get('group')  # may be None
+        subgroup_val = data.get('subgroup')  # may be None
+
+        # Process only if we have a valid type after fallback
+        if type_val:
+            # Validate type field
+            if type_val not in ("SERVICE", "HELPDESK"):
+                return jsonify({"error": "Invalid type. Must be SERVICE or HELPDESK"}), 400
+
+            # Example mappings – replace with the organisation's real mappings as needed
+            # Define allowed SERVICE groups here; leave empty set to disable strict check
+            SERVICE_GROUPS: set[str] = set()
+            # Define allowed HELPDESK group->subgroup mapping here; leave empty dict to disable strict check
+            HELPDESK_GROUPS: dict[str, set[str]] = {}
+
+            if type_val == "SERVICE":
+                # Fallback to existing requested value when group not provided
+                group_effective = group_val or ticket.requested
+                # SERVICE must have a valid group and will clear report/subgroup
+                if not group_effective:
+                    return jsonify({"error": "group is required for SERVICE type"}), 400
+                if SERVICE_GROUPS and group_effective not in SERVICE_GROUPS:
+                    return jsonify({"error": "Invalid group for SERVICE type"}), 400
+
+                if group_val is not None and ticket.requested != group_val:
+                    ticket.requested = group_val
+                    if 'requested' not in updated_fields:
+                        updated_fields.append('requested')
+                # Clear report & subgroup
+                if ticket.report is not None:
+                    ticket.report = None
+                    if 'report' not in updated_fields:
+                        updated_fields.append('report')
+                if ticket.subgroup is not None:
+                    ticket.subgroup = None
+                    if 'subgroup' not in updated_fields:
+                        updated_fields.append('subgroup')
+
+            else:  # HELPDESK
+                # HELPDESK requires both group and subgroup and clears requested
+                # Fallback to existing values when not provided
+                group_effective = group_val or ticket.report
+                subgroup_effective = subgroup_val or ticket.subgroup
+                if not group_effective or not subgroup_effective:
+                    return jsonify({"error": "group and subgroup are required for HELPDESK type"}), 400
+                if HELPDESK_GROUPS and (group_effective not in HELPDESK_GROUPS or subgroup_effective not in HELPDESK_GROUPS[group_effective]):
+                    return jsonify({"error": "Invalid group/subgroup for HELPDESK type"}), 400
+
+                if group_val is not None and ticket.report != group_val:
+                    ticket.report = group_val
+                    if 'report' not in updated_fields:
+                        updated_fields.append('report')
+                if ticket.requested is not None:
+                    ticket.requested = None
+                    if 'requested' not in updated_fields:
+                        updated_fields.append('requested')
+                if subgroup_val is not None and ticket.subgroup != subgroup_val:
+                    ticket.subgroup = subgroup_val
+                    if 'subgroup' not in updated_fields:
+                        updated_fields.append('subgroup')
+
+            # Finally update the type field itself if changed
+            if ticket.type != type_val:
+                ticket.type = type_val
+                if 'type' not in updated_fields:
+                    updated_fields.append('type')
 
         # หากสถานะมีการเปลี่ยนแปลง (ไม่นับ Cancelled ที่จะลบ)
         if 'status' in updated_fields and ticket.status != previous_status and data.get('status') != 'Cancelled':
@@ -1328,8 +1396,7 @@ def update_ticket():
             db.session.add(log_entry)
 
             # สร้าง Notification ภายในระบบ
-            notification = Notification()
-            notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}"
+            notification = Notification(message=f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}")
             db.session.add(notification)
 
         # ถ้า status ใหม่เป็น Cancelled ให้ลบ ticket และ message ที่เกี่ยวข้องทันที
@@ -1349,6 +1416,12 @@ def update_ticket():
 
         db.session.commit()
 
+        # เคลียร์ cache ของ /api/data เพื่อให้ frontend เห็นข้อมูลล่าสุดทันที
+        try:
+            cache.delete_memoized(get_data)
+        except Exception:
+            pass  # ไม่ขัดขวาง flow หลัก หากล้าง cache ล้มเหลว
+
         # ส่งแจ้งเตือน LINE เฉพาะเมื่อมีการอัปเดตสถานะ (และไม่ใช่ Cancelled)
         if 'status' in data and ticket.user_id:
             payload = {
@@ -1365,6 +1438,7 @@ def update_ticket():
                 'report': ticket.report,
                 'type': ticket.type,
                 'textbox': ticket.textbox,
+                'subgroup': ticket.subgroup,
             }
             notify_user(payload)
 
@@ -1840,8 +1914,7 @@ from sqlalchemy import Index
 @app.route('/api/log-status-change', methods=['POST'])
 def log_status_change():
     data = request.get_json()
-    print("DEBUG /api/log-status-change payload:", data)  # log ข้อมูลที่รับมา
-    required_fields = ['ticket_id', 'old_status', 'new_status', 'changed_by']
+    required_fields = ['ticket_id', 'old_status', 'new_status', 'changed_by', 'changed_at']
     missing = [f for f in required_fields if not data or not data.get(f)]
     if missing:
         return jsonify({'error': f'Missing fields: {", ".join(missing)}'}), 400
@@ -1853,10 +1926,8 @@ def log_status_change():
         return jsonify({'error': 'Ticket not found'}), 404
     try:
         # Parse timestamp
-        ts = data.get('changed_at')
-        if ts is None:
-            dt = datetime.utcnow()
-        elif isinstance(ts, str):
+        ts = data['changed_at']
+        if isinstance(ts, str):
             try:
                 # Accept ISO8601 with or without 'Z' UTC designator
                 if ts.endswith('Z'):
@@ -1872,9 +1943,7 @@ def log_status_change():
             old_status=data['old_status'],
             new_status=data['new_status'],
             changed_by=data['changed_by'],
-            changed_at=dt,
-            remarks=data.get('remarks', None),
-            internal_notes=data.get('internal_notes', None)
+            changed_at=dt
         )
         db.session.add(log)
         db.session.commit()
