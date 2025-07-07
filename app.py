@@ -1867,9 +1867,10 @@ def log_status_change():
 @app.route('/api/log-status-change', methods=['GET'])
 def get_status_logs():
     ticket_id = request.args.get('ticket_id')
-    if not ticket_id:
-        return jsonify({'error': 'ticket_id is required'}), 400
-    logs = TicketStatusLog.query.filter_by(ticket_id=ticket_id).order_by(TicketStatusLog.changed_at.asc()).all()
+    if ticket_id:
+        logs = TicketStatusLog.query.filter_by(ticket_id=ticket_id).order_by(TicketStatusLog.changed_at.asc()).all()
+    else:
+        logs = TicketStatusLog.query.order_by(TicketStatusLog.changed_at.desc()).all()
     return jsonify([l.to_dict() for l in logs])
 
 # Create index for ticket_id, change_timestamp for performance (if not exists)
