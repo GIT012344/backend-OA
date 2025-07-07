@@ -58,8 +58,8 @@ class Ticket(db.Model):
     type = db.Column(db.String)
     textbox = db.Column(db.String)
     subgroup = db.Column(db.String)
-    remarks = db.Column(db.String)
-    internal_notes = db.Column(db.String)
+    remarks = db.Column(db.String)  # หมายเหตุสำหรับลูกค้า
+    internal_notes = db.Column(db.String)  # หมายเหตุภายใน
 
 class Notification(db.Model):
     __tablename__ = 'notifications'
@@ -79,7 +79,7 @@ class Notification(db.Model):
         return {
             'id': self.id,
             'message': self.message,
-            'timestamp': self.get_thai_time().isoformat() if self.get_thai_time() else None,
+            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None,
             'read': self.read
         }
@@ -106,7 +106,7 @@ class Message(db.Model):
             'admin_id': self.admin_id,
             'sender_type': self.sender_type,
             'message': self.message,
-            'timestamp': self.get_thai_time().isoformat() if self.get_thai_time() else None,
+            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None
         }
 
@@ -118,8 +118,8 @@ class TicketStatusLog(db.Model):
     new_status = db.Column(db.String, nullable=False)
     changed_by = db.Column(db.String, nullable=False)
     changed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    remarks = db.Column(db.String)
-    internal_notes = db.Column(db.String)
+    remarks = db.Column(db.String)  # หมายเหตุสำหรับลูกค้า
+    internal_notes = db.Column(db.String)  # หมายเหตุภายใน
     
     def __init__(self, **kwargs):
         # Convert any provided datetime to UTC before saving
@@ -141,7 +141,7 @@ class TicketStatusLog(db.Model):
             'old_status': self.old_status,
             'new_status': self.new_status,
             'changed_by': self.changed_by,
-            'changed_at': self.get_thai_time().isoformat() if self.get_thai_time() else None,
+            'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
             'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None,
             'remarks': self.remarks,
             'internal_notes': self.internal_notes
@@ -838,8 +838,7 @@ def update_status():
 
         if current_status != new_status:
             ticket.status = new_status
-            
-            # Add remarks if provided
+            # เพิ่ม remarks/internal_notes ลงใน ticket
             if remarks:
                 ticket.remarks = remarks
             if internal_notes:
@@ -1297,7 +1296,7 @@ def update_ticket():
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
-
+        
         # เก็บสถานะเดิมไว้เพื่อตรวจสอบหลังอัปเดต
         previous_status = ticket.status
 
@@ -1308,7 +1307,10 @@ def update_ticket():
         ]
         updated_fields = []
         for field in editable_fields:
-            if field in data and getattr(ticket, field) != data[field]:
+            # Skip if the field isn't provided or the new value is None (to avoid unintended blanking)
+            if field not in data or data[field] is None:
+                continue
+            if getattr(ticket, field) != data[field]:
                 setattr(ticket, field, data[field])
                 updated_fields.append(field)
 
@@ -1319,7 +1321,7 @@ def update_ticket():
         subgroup_val = data.get('subgroup')  # may be None
 
         # Process only if we have a valid type after fallback
-        if type_val:
+        if type_val in ["SERVICE", "HELPDESK"]:
             # Validate type field
             if type_val not in ("SERVICE", "HELPDESK"):
                 return jsonify({"error": "Invalid type. Must be SERVICE or HELPDESK"}), 400
@@ -1334,7 +1336,8 @@ def update_ticket():
                 # Fallback to existing requested value when group not provided
                 group_effective = group_val or ticket.requested
                 # SERVICE must have a valid group and will clear report/subgroup
-                if not group_effective:
+                # Require group only if caller is trying to change it. If neither new group provided nor existing value present, keep as-is without error.
+                if group_val is not None and not group_effective:
                     return jsonify({"error": "group is required for SERVICE type"}), 400
                 if SERVICE_GROUPS and group_effective not in SERVICE_GROUPS:
                     return jsonify({"error": "Invalid group for SERVICE type"}), 400
@@ -1358,7 +1361,8 @@ def update_ticket():
                 # Fallback to existing values when not provided
                 group_effective = group_val or ticket.report
                 subgroup_effective = subgroup_val or ticket.subgroup
-                if not group_effective or not subgroup_effective:
+                # Only raise error if caller attempts to modify and omitted required fields
+                if (group_val is not None and not group_effective) or (subgroup_val is not None and not subgroup_effective):
                     return jsonify({"error": "group and subgroup are required for HELPDESK type"}), 400
                 if HELPDESK_GROUPS and (group_effective not in HELPDESK_GROUPS or subgroup_effective not in HELPDESK_GROUPS[group_effective]):
                     return jsonify({"error": "Invalid group/subgroup for HELPDESK type"}), 400
@@ -1407,8 +1411,7 @@ def update_ticket():
             db.session.add(log_entry)
 
             # สร้าง Notification ภายในระบบ
-            notification = Notification()
-            notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}"
+            notification = Notification(message=f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}")
             db.session.add(notification)
 
         # ถ้า status ใหม่เป็น Cancelled ให้ลบ ticket และ message ที่เกี่ยวข้องทันที
@@ -1420,7 +1423,7 @@ def update_ticket():
             notification = Notification()
             notification.message = f"Ticket {ticket_id} has been cancelled and deleted."
             db.session.add(notification)
-            db.session.commit()
+        db.session.commit()
             return jsonify({
                 "success": True,
                 "message": "Ticket cancelled and deleted successfully"
@@ -1434,8 +1437,8 @@ def update_ticket():
         except Exception:
             pass  # ไม่ขัดขวาง flow หลัก หากล้าง cache ล้มเหลว
 
-        # ส่งแจ้งเตือน LINE เฉพาะเมื่อมีการอัปเดตสถานะ (และไม่ใช่ Cancelled)
-        if 'status' in data and ticket.user_id:
+        # ส่งแจ้งเตือน LINE เฉพาะเมื่อมีการอัปเดตสถานะ (และไม่ใช่ Cancelled) และมี user_id
+        if 'status' in data and ticket.user_id and ticket.status != previous_status:
             payload = {
                 'ticket_id': ticket.ticket_id,
                 'user_id': ticket.user_id,
