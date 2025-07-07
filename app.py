@@ -57,6 +57,8 @@ class Ticket(db.Model):
     report = db.Column(db.String)
     type = db.Column(db.String)
     textbox = db.Column(db.String)
+    remarks = db.Column(db.Text)  # หมายเหตุสำหรับลูกค้า
+    internal_notes = db.Column(db.Text)  # หมายเหตุภายใน
 
 class Notification(db.Model):
     __tablename__ = 'notifications'
@@ -73,10 +75,11 @@ class Notification(db.Model):
         return None
         
     def to_dict(self):
+        thai_time = self.get_thai_time()
         return {
             'id': self.id,
             'message': self.message,
-            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
+            'timestamp': thai_time.isoformat() if thai_time else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None,
             'read': self.read
         }
@@ -97,13 +100,14 @@ class Message(db.Model):
         return None
         
     def to_dict(self):
+        thai_time = self.get_thai_time()
         return {
             'id': self.id,
             'user_id': self.user_id,
             'admin_id': self.admin_id,
             'sender_type': self.sender_type,
             'message': self.message,
-            'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
+            'timestamp': thai_time.isoformat() if thai_time else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None
         }
 
@@ -115,6 +119,8 @@ class TicketStatusLog(db.Model):
     new_status = db.Column(db.String, nullable=False)
     changed_by = db.Column(db.String, nullable=False)
     changed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    remarks = db.Column(db.Text)  # เพิ่มหมายเหตุ
+    internal_notes = db.Column(db.Text)  # เพิ่มหมายเหตุภายใน
     
     def __init__(self, **kwargs):
         # Convert any provided datetime to UTC before saving
@@ -130,14 +136,17 @@ class TicketStatusLog(db.Model):
         return None
     
     def to_dict(self):
+        thai_time = self.get_thai_time()
         return {
             'id': self.id,
             'ticket_id': self.ticket_id,
             'old_status': self.old_status,
             'new_status': self.new_status,
             'changed_by': self.changed_by,
-            'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
-            'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None
+            'changed_at': thai_time.isoformat() if thai_time else None,
+            'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None,
+            'remarks': self.remarks,
+            'internal_notes': self.internal_notes
         }
 
 class User(db.Model):
@@ -808,28 +817,31 @@ def update_status():
         
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
+    remarks = data.get("remarks", "")
+    internal_notes = data.get("internal_notes", "")
 
     if not ticket_id or not new_status:
         return jsonify({"error": "ticket_id and status required"}), 400
 
     try:
-        # Update PostgreSQL using SQLAlchemy
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
             
         current_status = ticket.status
 
-        # Only proceed if status is actually changing
         if current_status != new_status:
-            # Update status
             ticket.status = new_status
+            # Add remarks if provided
+            if remarks:
+                ticket.remarks = remarks
+            if internal_notes:
+                ticket.internal_notes = internal_notes
 
-            # Determine who performed the change (either supplied in payload or from JWT token)
             actor = data.get("changed_by")
             if not actor:
                 try:
-                    current_user = get_jwt_identity()  # may fail if no valid JWT context
+                    current_user = get_jwt_identity()
                     if isinstance(current_user, dict):
                         actor = current_user.get("name") or current_user.get("pin")
                     else:
@@ -837,25 +849,25 @@ def update_status():
                 except Exception:
                     actor = "admin"
 
-            # Create a log entry for this status change
             log_entry = TicketStatusLog(
                 ticket_id=ticket.ticket_id,
                 old_status=current_status,
                 new_status=new_status,
                 changed_by=actor,
-                changed_at=datetime.utcnow()
+                changed_at=datetime.utcnow(),
+                remarks=remarks,
+                internal_notes=internal_notes
             )
             db.session.add(log_entry)
 
-            # Create notification
             notification = Notification()
             notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
+            if remarks:
+                notification.message += f"\nRemarks: {remarks}"
             db.session.add(notification)
 
-            # Commit all changes in a single transaction
             db.session.commit()
             
-            # Send LINE notification if user_id exists
             if ticket.user_id:
                 payload = {
                     'ticket_id': ticket.ticket_id,
@@ -871,10 +883,11 @@ def update_status():
                     'report': ticket.report,
                     'type': ticket.type,
                     'textbox': ticket.textbox,
+                    'remarks': remarks
                 }
                 notify_user(payload)
                     
-            return jsonify({"message": "Status updated in PostgreSQL"})
+            return jsonify({"message": "Status updated successfully", "remarks": remarks})
         else:
             return jsonify({"message": "Status unchanged"})
             
@@ -1315,7 +1328,8 @@ def update_ticket():
             db.session.add(log_entry)
 
             # สร้าง Notification ภายในระบบ
-            notification = Notification(message=f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}")
+            notification = Notification()
+            notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}"
             db.session.add(notification)
 
         # ถ้า status ใหม่เป็น Cancelled ให้ลบ ticket และ message ที่เกี่ยวข้องทันที
