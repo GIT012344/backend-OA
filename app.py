@@ -13,11 +13,13 @@ from flask_jwt_extended import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
+from flask_socketio import SocketIO, emit
 
 LINE_ACCESS_TOKEN = "SaXxPgiqWnhbTbwQRoJDnvALTrp+ymslDXHUUo/+Tg1VeqzyGZu7iATjq0EiMYiSGAYKmiuMntQTaOuet4VUiz349QnmJXrKrYWR5k+PDDM1QRebmq5N2Z0kWsmDNBa+3EKmFQUAtuq9SYnXp97+ywdB04t89/1O/w1cDnyilFU="
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 app.config['JWT_SECRET_KEY'] = 'your-secret-key-here'  # ควรเปลี่ยนเป็นค่าที่ปลอดภัยใน production
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)  # Token หมดอายุใน 24 ชั่วโมง
@@ -637,7 +639,6 @@ def auth_status():
         return jsonify({"authenticated": False, "message": "Server error"}), 500
 
 @app.route('/api/data')
-@cache.cached(timeout=60) 
 def get_data():
     try:
         # Use SQLAlchemy to query tickets
@@ -1892,6 +1893,14 @@ def create_ticket_status_logs_table():
         if not inspector.has_table('ticket_status_logs'):
             db.create_all()
 
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+
 @app.route('/update-status-with-note', methods=['POST'])
 def update_status_with_note():
     data = request.get_json()
@@ -1910,12 +1919,10 @@ def update_status_with_note():
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
-            
         current_status = ticket.status
         if current_status != new_status:
             ticket.status = new_status
             ticket.subgroup = data.get('subgroup', ticket.subgroup)
-            
             actor = data.get("changed_by")
             if not actor:
                 try:
@@ -1926,7 +1933,6 @@ def update_status_with_note():
                         actor = str(current_user)
                 except Exception:
                     actor = "admin"
-                    
             log_entry = TicketStatusLog(
                 ticket_id=ticket.ticket_id,
                 old_status=current_status,
@@ -1937,15 +1943,15 @@ def update_status_with_note():
                 remarks=remarks
             )
             db.session.add(log_entry)
-            
             notification_msg = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
             if note:
                 notification_msg += f"\nหมายเหตุ: {note}"
-                
-            notification = Notification(message=notification_msg)
+            if remarks:
+                notification_msg += f"\nหมายเหตุเพิ่มเติม: {remarks}"
+            notification = Notification()
+            notification.message = notification_msg
             db.session.add(notification)
             db.session.commit()
-            
             if ticket.user_id:
                 payload = {
                     'ticket_id': ticket.ticket_id,
@@ -1961,10 +1967,18 @@ def update_status_with_note():
                     'report': ticket.report,
                     'type': ticket.type,
                     'textbox': ticket.textbox,
-                    'note': note
+                    'note': note,
+                    'remarks': remarks
                 }
                 notify_user(payload)
-                
+            # --- emit event ผ่าน websocket ---
+            socketio.emit('ticket_updated', {
+                'ticket_id': ticket_id,
+                'new_status': new_status,
+                'note': note,
+                'remarks': remarks,
+                'timestamp': datetime.utcnow().isoformat()
+            })
             return jsonify({
                 "success": True,
                 "message": "Status updated with notes",
@@ -1981,4 +1995,4 @@ if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
         create_ticket_status_logs_table()
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False)
