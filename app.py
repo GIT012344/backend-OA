@@ -115,7 +115,8 @@ class TicketStatusLog(db.Model):
     new_status = db.Column(db.String, nullable=False)
     changed_by = db.Column(db.String, nullable=False)
     changed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    note = db.Column(db.Text)  # เพิ่มฟิลด์สำหรับเก็บหมายเหตุ (ไม่กระทบ logic เดิม)
+    note = db.Column(db.Text)
+    remarks = db.Column(db.Text)   # เพิ่มฟิลด์สำหรับเก็บหมายเหตุ (ไม่กระทบ logic เดิม)
     
     def __init__(self, **kwargs):
         # Convert any provided datetime to UTC before saving
@@ -140,6 +141,7 @@ class TicketStatusLog(db.Model):
             'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
             'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None,
             'note': self.note
+            'remarks': self.remarks
         }
 
 class User(db.Model):
@@ -1899,6 +1901,7 @@ def update_status_with_note():
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
     note = data.get("note", "")
+    remarks = data.get("remarks", "")
 
     if not ticket_id or not new_status:
         return jsonify({"error": "ticket_id and status required"}), 400
@@ -1907,10 +1910,12 @@ def update_status_with_note():
         ticket = Ticket.query.get(ticket_id)
         if not ticket:
             return jsonify({"error": "Ticket not found"}), 404
+            
         current_status = ticket.status
         if current_status != new_status:
             ticket.status = new_status
             ticket.subgroup = data.get('subgroup', ticket.subgroup)
+            
             actor = data.get("changed_by")
             if not actor:
                 try:
@@ -1921,21 +1926,26 @@ def update_status_with_note():
                         actor = str(current_user)
                 except Exception:
                     actor = "admin"
+                    
             log_entry = TicketStatusLog(
                 ticket_id=ticket.ticket_id,
                 old_status=current_status,
                 new_status=new_status,
                 changed_by=actor,
                 changed_at=datetime.utcnow(),
-                note=note
+                note=note,
+                remarks=remarks
             )
             db.session.add(log_entry)
+            
             notification_msg = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
             if note:
                 notification_msg += f"\nหมายเหตุ: {note}"
+                
             notification = Notification(message=notification_msg)
             db.session.add(notification)
             db.session.commit()
+            
             if ticket.user_id:
                 payload = {
                     'ticket_id': ticket.ticket_id,
@@ -1954,10 +1964,12 @@ def update_status_with_note():
                     'note': note
                 }
                 notify_user(payload)
+                
             return jsonify({
                 "success": True,
-                "message": "Status updated with note",
-                "note": note
+                "message": "Status updated with notes",
+                "note": note,
+                "remarks": remarks
             })
         else:
             return jsonify({"message": "Status unchanged"})
