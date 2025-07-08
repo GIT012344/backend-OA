@@ -140,7 +140,7 @@ class TicketStatusLog(db.Model):
             'changed_by': self.changed_by,
             'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
             'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None,
-            'note': self.note
+            'note': self.note,
             'remarks': self.remarks
         }
 
