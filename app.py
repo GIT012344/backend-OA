@@ -115,15 +115,18 @@ class TicketStatusLog(db.Model):
     new_status = db.Column(db.String, nullable=False)
     changed_by = db.Column(db.String, nullable=False)
     changed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    remarks = db.Column(db.Text)  # เพิ่มฟิลด์ remarks
+    remark = db.Column(db.Text, nullable=True)  # หมายเหตุ (Remark)
+    detail = db.Column(db.Text, nullable=True)  # รายละเอียดเพิ่มเติม (Detail)
     
     def __init__(self, **kwargs):
+        # Convert any provided datetime to UTC before saving
         if 'changed_at' in kwargs and kwargs['changed_at']:
             if kwargs['changed_at'].tzinfo is not None:
                 kwargs['changed_at'] = kwargs['changed_at'].astimezone(timezone.utc).replace(tzinfo=None)
         super(TicketStatusLog, self).__init__(**kwargs)
-    
+        
     def get_thai_time(self):
+        # Convert stored UTC time to Thai time when retrieving
         if self.changed_at:
             return self.changed_at.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=7)))
         return None
@@ -137,7 +140,8 @@ class TicketStatusLog(db.Model):
             'changed_by': self.changed_by,
             'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
             'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None,
-            'remarks': self.remarks
+            'remark': self.remark,
+            'detail': self.detail
         }
 
 class User(db.Model):
@@ -846,6 +850,10 @@ def update_status():
             ticket.status = new_status
             ticket.subgroup = data.get('subgroup', ticket.subgroup)
 
+            # รับ remark และ detail จาก request
+            remark = data.get('remark')
+            detail = data.get('detail')
+
             # Determine who performed the change (either supplied in payload or from JWT token)
             actor = data.get("changed_by")
             if not actor:
@@ -864,7 +872,9 @@ def update_status():
                 old_status=current_status,
                 new_status=new_status,
                 changed_by=actor,
-                changed_at=datetime.utcnow()
+                changed_at=datetime.utcnow(),
+                remark=remark,
+                detail=detail
             )
             db.session.add(log_entry)
 
@@ -1947,82 +1957,43 @@ from sqlalchemy import Index
 @app.route('/api/log-status-change', methods=['POST'])
 def log_status_change():
     data = request.get_json()
-    required_fields = ['ticket_id', 'old_status', 'new_status', 'changed_by', 'change_timestamp']
+    required_fields = ['ticket_id', 'old_status', 'new_status', 'changed_by', 'changed_at']
     missing = [f for f in required_fields if not data or not data.get(f)]
     if missing:
         return jsonify({'error': f'Missing fields: {", ".join(missing)}'}), 400
+    if data['old_status'] == data['new_status']:
+        return jsonify({'error': 'new_status must be different from old_status'}), 400
+    # Validate ticket exists
+    ticket = Ticket.query.get(data['ticket_id'])
+    if not ticket:
+        return jsonify({'error': 'Ticket not found'}), 404
     try:
+        # Parse timestamp
+        ts = data['changed_at']
+        if isinstance(ts, str):
+            try:
+                # Accept ISO8601 with or without 'Z' UTC designator
+                if ts.endswith('Z'):
+                    ts = ts[:-1] + '+00:00'  # convert Z to +00:00 for fromisoformat
+                dt = datetime.fromisoformat(ts)
+            except Exception:
+                return jsonify({'error': 'Invalid timestamp format, must be ISO8601'}), 400
+        else:
+            return jsonify({'error': 'changed_at must be string'}), 400
+
         log = TicketStatusLog(
             ticket_id=data['ticket_id'],
             old_status=data['old_status'],
             new_status=data['new_status'],
             changed_by=data['changed_by'],
-            changed_at=datetime.fromisoformat(data['change_timestamp']),
-            remarks=data.get('remarks', '')
+            changed_at=dt
         )
         db.session.add(log)
         db.session.commit()
-        # ส่ง LINE Notify ถ้ามีหมายเหตุ
-        if data.get('remarks'):
-            ticket = Ticket.query.get(data['ticket_id'])
-            if ticket and ticket.user_id:
-                send_remarks_notification(
-                    ticket.user_id,
-                    data['old_status'],
-                    data['new_status'],
-                    data['remarks']
-                )
         return jsonify({'success': True}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
-def send_remarks_notification(user_id, old_status, new_status, remarks):
-    url = "https://api.line.me/v2/bot/message/push"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
-    }
-    payload = {
-        "to": user_id,
-        "messages": [{
-            "type": "flex",
-            "altText": "หมายเหตุการเปลี่ยนสถานะ",
-            "contents": {
-                "type": "bubble",
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {
-                            "type": "text",
-                            "text": "📝 หมายเหตุการเปลี่ยนสถานะ",
-                            "weight": "bold",
-                            "size": "lg",
-                            "color": "#005BBB"
-                        },
-                        {
-                            "type": "text",
-                            "text": f"จาก: {old_status} → เป็น: {new_status}",
-                            "margin": "md",
-                            "size": "sm"
-                        },
-                        {
-                            "type": "separator",
-                            "margin": "md"
-                        },
-                        {
-                            "type": "text",
-                            "text": remarks,
-                            "wrap": True,
-                            "margin": "md"
-                        }
-                    ]
-                }
-            }
-        }]
-    }
-    requests.post(url, headers=headers, json=payload)
 
 @app.route('/api/log-status-change', methods=['GET'])
 def get_status_logs():
