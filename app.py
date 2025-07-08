@@ -210,7 +210,10 @@ def notify_user(payload):
         "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
     }
 
-    # แปลง payload เป็น Flex Message แบบเดียวกับใน Apps Script
+    # Logging payload
+    print(f"[notify_user] payload: {payload}")
+
+    # สร้าง Flex Message จาก payload โดยไม่กรอง type
     flex_message = create_flex_message(payload)
 
     body = {
@@ -219,6 +222,7 @@ def notify_user(payload):
     }
 
     response = requests.post(url, headers=headers, json=body)
+    print(f"[notify_user] LINE API response: {response.status_code} {response.text}")
     return response.status_code == 200
 
 def create_flex_message(payload):
@@ -239,6 +243,9 @@ def create_flex_message(payload):
         'On Hold': '#A020F0',       # ม่วง
         'Rejected': '#FF0000',      # แดง (ถ้ามี)
     }.get(status, '#666666')
+
+    # Logging payload type
+    print(f"[create_flex_message] payload type: {payload.get('type')}")
 
     return {
         "type": "flex",
@@ -830,7 +837,6 @@ def update_status():
 
         # Only proceed if status is actually changing
         if current_status != new_status:
-            # Update status
             ticket.status = new_status
             ticket.subgroup = data.get('subgroup', ticket.subgroup)
 
@@ -861,11 +867,13 @@ def update_status():
             notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
             db.session.add(notification)
 
-            # Commit all changes in a single transaction
             db.session.commit()
             
-            # Send LINE notification if user_id exists
+            # Logging ก่อนส่ง LINE Notify
+            print(f"[LINE Notify] Attempting to send notification for ticket {ticket_id} (Type: {ticket.type}, User ID: {ticket.user_id})")
+            # ส่ง LINE notification สำหรับทุกประเภท Ticket ที่มี user_id
             if ticket.user_id:
+                print(f"[LINE Notify] Sending notification to user {ticket.user_id}")
                 payload = {
                     'ticket_id': ticket.ticket_id,
                     'user_id': ticket.user_id,
@@ -881,8 +889,10 @@ def update_status():
                     'type': ticket.type,
                     'textbox': ticket.textbox,
                 }
-                notify_user(payload)
-                    
+                notify_user(payload)  # เรียกใช้ฟังก์ชันส่ง notification
+            else:
+                print(f"[LINE Notify] No user_id found, skipping LINE notification")
+                
             return jsonify({"message": "Status updated in PostgreSQL"})
         else:
             return jsonify({"message": "Status unchanged"})
