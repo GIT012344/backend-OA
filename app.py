@@ -115,8 +115,7 @@ class TicketStatusLog(db.Model):
     new_status = db.Column(db.String, nullable=False)
     changed_by = db.Column(db.String, nullable=False)
     changed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    remark = db.Column(db.Text, nullable=True)  # หมายเหตุ (Remark)
-    detail = db.Column(db.Text, nullable=True)  # รายละเอียดเพิ่มเติม (Detail)
+    note = db.Column(db.Text)  # เพิ่มฟิลด์สำหรับเก็บหมายเหตุ (ไม่กระทบ logic เดิม)
     
     def __init__(self, **kwargs):
         # Convert any provided datetime to UTC before saving
@@ -140,8 +139,7 @@ class TicketStatusLog(db.Model):
             'changed_by': self.changed_by,
             'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
             'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None,
-            'remark': self.remark,
-            'detail': self.detail
+            'note': self.note
         }
 
 class User(db.Model):
@@ -213,6 +211,7 @@ def notify_user(payload):
     payload['requested'] = payload.get('requested') if payload.get('requested') is not None else 'ไม่มีข้อมูล'
     payload['textbox'] = payload.get('textbox') if payload.get('textbox') is not None else 'ไม่มีข้อมูล'
     payload['subgroup'] = payload.get('subgroup') if payload.get('subgroup') is not None else 'ไม่มีข้อมูล'
+    payload['note'] = payload.get('note', 'ไม่มีหมายเหตุเพิ่มเติม')
     # Log payload หลังจากแก้ไขแล้ว
     print(f"[notify_user] Final payload: {payload}")
     url = "https://api.line.me/v2/bot/message/push"
@@ -257,6 +256,231 @@ def create_flex_message(payload):
         problem_text = payload.get('report', 'ไม่มีข้อมูล')
     if problem_text is None:
         problem_text = 'ไม่มีข้อมูล'
+    note_text = payload.get('note', 'ไม่มีหมายเหตุเพิ่มเติม')
+    flex_body = [
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "หมายเลข",
+                    "weight": "bold",
+                    "size": "sm",
+                    "flex": 2,
+                    "color": "#666666"
+                },
+                {
+                    "type": "text",
+                    "text": payload.get('ticket_id', ''),
+                    "size": "sm",
+                    "flex": 4,
+                    "align": "end"
+                }
+            ],
+            "spacing": "sm",
+            "margin": "md"
+        },
+        {
+            "type": "separator",
+            "margin": "md"
+        },
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "ชื่อ",
+                    "weight": "bold",
+                    "size": "sm",
+                    "flex": 2,
+                    "color": "#666666"
+                },
+                {
+                    "type": "text",
+                    "text": payload.get('name', ''),
+                    "size": "sm",
+                    "flex": 4,
+                    "align": "end"
+                }
+            ],
+            "spacing": "sm",
+            "margin": "md"
+        },
+        {
+            "type": "separator",
+            "margin": "md"
+        },
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "แผนก",
+                    "weight": "bold",
+                    "size": "sm",
+                    "flex": 2,
+                    "color": "#666666"
+                },
+                {
+                    "type": "text",
+                    "text": payload.get('department', ''),
+                    "size": "sm",
+                    "flex": 4,
+                    "align": "end"
+                }
+            ],
+            "spacing": "sm",
+            "margin": "md"
+        },
+        {
+            "type": "separator",
+            "margin": "md"
+        },
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "เบอร์ติดต่อ",
+                    "weight": "bold",
+                    "size": "sm",
+                    "flex": 2,
+                    "color": "#666666"
+                },
+                {
+                    "type": "text",
+                    "text": payload.get('phone', ''),
+                    "size": "sm",
+                    "flex": 4,
+                    "align": "end"
+                }
+            ],
+            "spacing": "sm",
+            "margin": "md"
+        },
+        {
+            "type": "separator",
+            "margin": "md"
+        },
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "Type",
+                    "weight": "bold",
+                    "size": "sm",
+                    "flex": 2,
+                    "color": "#666666"
+                },
+                {
+                    "type": "text",
+                    "text": payload.get('type', ''),
+                    "size": "sm",
+                    "flex": 4,
+                    "align": "end"
+                }
+            ],
+            "spacing": "sm",
+            "margin": "md"
+        },
+        {
+            "type": "separator",
+            "margin": "md"
+        },
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "ปัญหา",
+                    "weight": "bold",
+                    "size": "sm",
+                    "flex": 2,
+                    "color": "#666666"
+                },
+                {
+                    "type": "text",
+                    "text": problem_text,  # ใช้ค่าที่ตรวจสอบแล้วตามประเภท Ticket
+                    "size": "sm",
+                    "flex": 4,
+                    "align": "end",
+                    "wrap": True
+                }
+            ],
+            "spacing": "sm",
+            "margin": "md"
+        },
+        {
+            "type": "separator",
+            "margin": "md"
+        },
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "วันที่นัดหมาย",
+                    "weight": "bold",
+                    "size": "sm",
+                    "flex": 2,
+                    "color": "#666666"
+                },
+                {
+                    "type": "text",
+                    "text": appointment_date,
+                    "size": "sm",
+                    "flex": 4,
+                    "align": "end"
+                }
+            ],
+            "spacing": "sm",
+            "margin": "md"
+        },
+        {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "สถานะล่าสุด",
+                    "weight": "bold",
+                    "size": "sm",
+                    "color": "#666666",
+                    "margin": "md"
+                },
+                {
+                    "type": "text",
+                    "text": status,
+                    "weight": "bold",
+                    "size": "xl",
+                    "color": status_color,
+                    "align": "center",
+                    "margin": "sm"
+                }
+            ],
+            "backgroundColor": "#F5F5F5",
+            "cornerRadius": "md",
+            "margin": "xl",
+            "paddingAll": "md"
+        }
+    ]
+    # เพิ่มกล่องหมายเหตุหลังสถานะล่าสุด
+    flex_body.append({
+        "type": "text",
+        "text": "หมายเหตุ: " + note_text,
+        "size": "sm",
+        "color": "#64748b",
+        "wrap": True,
+        "margin": "md"
+    })
     return {
         "type": "flex",
         "altText": "อัปเดตสถานะ Ticket ของคุณ",
@@ -282,221 +506,7 @@ def create_flex_message(payload):
             "body": {
                 "type": "box",
                 "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "หมายเลข",
-                                "weight": "bold",
-                                "size": "sm",
-                                "flex": 2,
-                                "color": "#666666"
-                            },
-                            {
-                                "type": "text",
-                                "text": payload.get('ticket_id', ''),
-                                "size": "sm",
-                                "flex": 4,
-                                "align": "end"
-                            }
-                        ],
-                        "spacing": "sm",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "ชื่อ",
-                                "weight": "bold",
-                                "size": "sm",
-                                "flex": 2,
-                                "color": "#666666"
-                            },
-                            {
-                                "type": "text",
-                                "text": payload.get('name', ''),
-                                "size": "sm",
-                                "flex": 4,
-                                "align": "end"
-                            }
-                        ],
-                        "spacing": "sm",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "แผนก",
-                                "weight": "bold",
-                                "size": "sm",
-                                "flex": 2,
-                                "color": "#666666"
-                            },
-                            {
-                                "type": "text",
-                                "text": payload.get('department', ''),
-                                "size": "sm",
-                                "flex": 4,
-                                "align": "end"
-                            }
-                        ],
-                        "spacing": "sm",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "เบอร์ติดต่อ",
-                                "weight": "bold",
-                                "size": "sm",
-                                "flex": 2,
-                                "color": "#666666"
-                            },
-                            {
-                                "type": "text",
-                                "text": payload.get('phone', ''),
-                                "size": "sm",
-                                "flex": 4,
-                                "align": "end"
-                            }
-                        ],
-                        "spacing": "sm",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "Type",
-                                "weight": "bold",
-                                "size": "sm",
-                                "flex": 2,
-                                "color": "#666666"
-                            },
-                            {
-                                "type": "text",
-                                "text": payload.get('type', ''),
-                                "size": "sm",
-                                "flex": 4,
-                                "align": "end"
-                            }
-                        ],
-                        "spacing": "sm",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "ปัญหา",
-                                "weight": "bold",
-                                "size": "sm",
-                                "flex": 2,
-                                "color": "#666666"
-                            },
-                            {
-                                "type": "text",
-                                "text": problem_text,  # ใช้ค่าที่ตรวจสอบแล้วตามประเภท Ticket
-                                "size": "sm",
-                                "flex": 4,
-                                "align": "end",
-                                "wrap": True
-                            }
-                        ],
-                        "spacing": "sm",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "วันที่นัดหมาย",
-                                "weight": "bold",
-                                "size": "sm",
-                                "flex": 2,
-                                "color": "#666666"
-                            },
-                            {
-                                "type": "text",
-                                "text": appointment_date,
-                                "size": "sm",
-                                "flex": 4,
-                                "align": "end"
-                            }
-                        ],
-                        "spacing": "sm",
-                        "margin": "md"
-                    },
-                    {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "สถานะล่าสุด",
-                                "weight": "bold",
-                                "size": "sm",
-                                "color": "#666666",
-                                "margin": "md"
-                            },
-                            {
-                                "type": "text",
-                                "text": status,
-                                "weight": "bold",
-                                "size": "xl",
-                                "color": status_color,
-                                "align": "center",
-                                "margin": "sm"
-                            }
-                        ],
-                        "backgroundColor": "#F5F5F5",
-                        "cornerRadius": "md",
-                        "margin": "xl",
-                        "paddingAll": "md"
-                    }
-                ],
+                "contents": flex_body,
                 "spacing": "md",
                 "paddingAll": "20px"
             },
@@ -850,10 +860,6 @@ def update_status():
             ticket.status = new_status
             ticket.subgroup = data.get('subgroup', ticket.subgroup)
 
-            # รับ remark และ detail จาก request
-            remark = data.get('remark')
-            detail = data.get('detail')
-
             # Determine who performed the change (either supplied in payload or from JWT token)
             actor = data.get("changed_by")
             if not actor:
@@ -872,9 +878,7 @@ def update_status():
                 old_status=current_status,
                 new_status=new_status,
                 changed_by=actor,
-                changed_at=datetime.utcnow(),
-                remark=remark,
-                detail=detail
+                changed_at=datetime.utcnow()
             )
             db.session.add(log_entry)
 
@@ -2015,6 +2019,81 @@ def create_ticket_status_logs_table():
         inspector = inspect(db.engine)
         if not inspector.has_table('ticket_status_logs'):
             db.create_all()
+
+@app.route('/update-status-with-note', methods=['POST'])
+def update_status_with_note():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
+    ticket_id = data.get("ticket_id")
+    new_status = data.get("status")
+    note = data.get("note", "")
+
+    if not ticket_id or not new_status:
+        return jsonify({"error": "ticket_id and status required"}), 400
+
+    try:
+        ticket = Ticket.query.get(ticket_id)
+        if not ticket:
+            return jsonify({"error": "Ticket not found"}), 404
+        current_status = ticket.status
+        if current_status != new_status:
+            ticket.status = new_status
+            ticket.subgroup = data.get('subgroup', ticket.subgroup)
+            actor = data.get("changed_by")
+            if not actor:
+                try:
+                    current_user = get_jwt_identity()
+                    if isinstance(current_user, dict):
+                        actor = current_user.get("name") or current_user.get("pin")
+                    else:
+                        actor = str(current_user)
+                except Exception:
+                    actor = "admin"
+            log_entry = TicketStatusLog(
+                ticket_id=ticket.ticket_id,
+                old_status=current_status,
+                new_status=new_status,
+                changed_by=actor,
+                changed_at=datetime.utcnow(),
+                note=note
+            )
+            db.session.add(log_entry)
+            notification_msg = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
+            if note:
+                notification_msg += f"\nหมายเหตุ: {note}"
+            notification = Notification(message=notification_msg)
+            db.session.add(notification)
+            db.session.commit()
+            if ticket.user_id:
+                payload = {
+                    'ticket_id': ticket.ticket_id,
+                    'user_id': ticket.user_id,
+                    'status': new_status,
+                    'email': ticket.email,
+                    'name': ticket.name,
+                    'phone': ticket.phone,
+                    'department': ticket.department,
+                    'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
+                    'appointment': ticket.appointment,
+                    'requested': ticket.requested,
+                    'report': ticket.report,
+                    'type': ticket.type,
+                    'textbox': ticket.textbox,
+                    'note': note
+                }
+                notify_user(payload)
+            return jsonify({
+                "success": True,
+                "message": "Status updated with note",
+                "note": note
+            })
+        else:
+            return jsonify({"message": "Status unchanged"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():
