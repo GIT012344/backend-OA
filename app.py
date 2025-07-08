@@ -246,9 +246,7 @@ def create_flex_message(payload):
         'On Hold': '#A020F0',       # ม่วง
         'Rejected': '#FF0000',      # แดง (ถ้ามี)
     }.get(status, '#666666')
-    # Logging payload type
     print(f"[create_flex_message] payload type: {payload.get('type')}")
-    # ตรวจสอบประเภท Ticket ก่อนแสดงปัญหา
     ticket_type = (payload.get('type') or '').upper()
     if ticket_type == 'SERVICE':
         problem_text = payload.get('requested', 'ไม่มีข้อมูล')
@@ -262,184 +260,74 @@ def create_flex_message(payload):
             "type": "box",
             "layout": "horizontal",
             "contents": [
-                {
-                    "type": "text",
-                    "text": "หมายเลข",
-                    "weight": "bold",
-                    "size": "sm",
-                    "flex": 2,
-                    "color": "#666666"
-                },
-                {
-                    "type": "text",
-                    "text": payload.get('ticket_id', ''),
-                    "size": "sm",
-                    "flex": 4,
-                    "align": "end"
-                }
+                {"type": "text", "text": "หมายเลข", "weight": "bold", "size": "sm", "flex": 2, "color": "#666666"},
+                {"type": "text", "text": payload.get('ticket_id', ''), "size": "sm", "flex": 4, "align": "end"}
             ],
             "spacing": "sm",
             "margin": "md"
         },
-        {
-            "type": "separator",
-            "margin": "md"
-        },
+        {"type": "separator", "margin": "md"},
         {
             "type": "box",
             "layout": "horizontal",
             "contents": [
-                {
-                    "type": "text",
-                    "text": "ชื่อ",
-                    "weight": "bold",
-                    "size": "sm",
-                    "flex": 2,
-                    "color": "#666666"
-                },
-                {
-                    "type": "text",
-                    "text": payload.get('name', ''),
-                    "size": "sm",
-                    "flex": 4,
-                    "align": "end"
-                }
+                {"type": "text", "text": "ชื่อ", "weight": "bold", "size": "sm", "flex": 2, "color": "#666666"},
+                {"type": "text", "text": payload.get('name', ''), "size": "sm", "flex": 4, "align": "end"}
             ],
             "spacing": "sm",
             "margin": "md"
         },
-        {
-            "type": "separator",
-            "margin": "md"
-        },
+        {"type": "separator", "margin": "md"},
         {
             "type": "box",
             "layout": "horizontal",
             "contents": [
-                {
-                    "type": "text",
-                    "text": "แผนก",
-                    "weight": "bold",
-                    "size": "sm",
-                    "flex": 2,
-                    "color": "#666666"
-                },
-                {
-                    "type": "text",
-                    "text": payload.get('department', ''),
-                    "size": "sm",
-                    "flex": 4,
-                    "align": "end"
-                }
+                {"type": "text", "text": "แผนก", "weight": "bold", "size": "sm", "flex": 2, "color": "#666666"},
+                {"type": "text", "text": payload.get('department', ''), "size": "sm", "flex": 4, "align": "end"}
             ],
             "spacing": "sm",
             "margin": "md"
         },
-        {
-            "type": "separator",
-            "margin": "md"
-        },
+        {"type": "separator", "margin": "md"},
         {
             "type": "box",
             "layout": "horizontal",
             "contents": [
-                {
-                    "type": "text",
-                    "text": "เบอร์ติดต่อ",
-                    "weight": "bold",
-                    "size": "sm",
-                    "flex": 2,
-                    "color": "#666666"
-                },
-                {
-                    "type": "text",
-                    "text": payload.get('phone', ''),
-                    "size": "sm",
-                    "flex": 4,
-                    "align": "end"
-                }
+                {"type": "text", "text": "เบอร์ติดต่อ", "weight": "bold", "size": "sm", "flex": 2, "color": "#666666"},
+                {"type": "text", "text": payload.get('phone', ''), "size": "sm", "flex": 4, "align": "end"}
             ],
             "spacing": "sm",
             "margin": "md"
         },
-        {
-            "type": "separator",
-            "margin": "md"
-        },
+        {"type": "separator", "margin": "md"},
         {
             "type": "box",
             "layout": "horizontal",
             "contents": [
-                {
-                    "type": "text",
-                    "text": "Type",
-                    "weight": "bold",
-                    "size": "sm",
-                    "flex": 2,
-                    "color": "#666666"
-                },
-                {
-                    "type": "text",
-                    "text": payload.get('type', ''),
-                    "size": "sm",
-                    "flex": 4,
-                    "align": "end"
-                }
+                {"type": "text", "text": "Type", "weight": "bold", "size": "sm", "flex": 2, "color": "#666666"},
+                {"type": "text", "text": payload.get('type', ''), "size": "sm", "flex": 4, "align": "end"}
             ],
             "spacing": "sm",
             "margin": "md"
         },
-        {
-            "type": "separator",
-            "margin": "md"
-        },
+        {"type": "separator", "margin": "md"},
         {
             "type": "box",
             "layout": "horizontal",
             "contents": [
-                {
-                    "type": "text",
-                    "text": "ปัญหา",
-                    "weight": "bold",
-                    "size": "sm",
-                    "flex": 2,
-                    "color": "#666666"
-                },
-                {
-                    "type": "text",
-                    "text": problem_text,  # ใช้ค่าที่ตรวจสอบแล้วตามประเภท Ticket
-                    "size": "sm",
-                    "flex": 4,
-                    "align": "end",
-                    "wrap": True
-                }
+                {"type": "text", "text": "ปัญหา", "weight": "bold", "size": "sm", "flex": 2, "color": "#666666"},
+                {"type": "text", "text": problem_text, "size": "sm", "flex": 4, "align": "end", "wrap": True}
             ],
             "spacing": "sm",
             "margin": "md"
         },
-        {
-            "type": "separator",
-            "margin": "md"
-        },
+        {"type": "separator", "margin": "md"},
         {
             "type": "box",
             "layout": "horizontal",
             "contents": [
-                {
-                    "type": "text",
-                    "text": "วันที่นัดหมาย",
-                    "weight": "bold",
-                    "size": "sm",
-                    "flex": 2,
-                    "color": "#666666"
-                },
-                {
-                    "type": "text",
-                    "text": appointment_date,
-                    "size": "sm",
-                    "flex": 4,
-                    "align": "end"
-                }
+                {"type": "text", "text": "วันที่นัดหมาย", "weight": "bold", "size": "sm", "flex": 2, "color": "#666666"},
+                {"type": "text", "text": appointment_date, "size": "sm", "flex": 4, "align": "end"}
             ],
             "spacing": "sm",
             "margin": "md"
@@ -448,23 +336,9 @@ def create_flex_message(payload):
             "type": "box",
             "layout": "vertical",
             "contents": [
-                {
-                    "type": "text",
-                    "text": "สถานะล่าสุด",
-                    "weight": "bold",
-                    "size": "sm",
-                    "color": "#666666",
-                    "margin": "md"
-                },
-                {
-                    "type": "text",
-                    "text": status,
-                    "weight": "bold",
-                    "size": "xl",
-                    "color": status_color,
-                    "align": "center",
-                    "margin": "sm"
-                }
+                {"type": "text", "text": "สถานะล่าสุด", "weight": "bold", "size": "sm", "color": "#666666", "margin": "md"},
+                {"type": "text", "text": status, "weight": "bold", "size": "xl", "color": status_color, "align": "center", "margin": "sm"},
+                {"type": "text", "text": "หมายเหตุ: " + note_text, "size": "sm", "color": "#64748b", "wrap": True, "margin": "md"}
             ],
             "backgroundColor": "#F5F5F5",
             "cornerRadius": "md",
@@ -472,15 +346,6 @@ def create_flex_message(payload):
             "paddingAll": "md"
         }
     ]
-    # เพิ่มกล่องหมายเหตุหลังสถานะล่าสุด
-    flex_body.append({
-        "type": "text",
-        "text": "หมายเหตุ: " + note_text,
-        "size": "sm",
-        "color": "#64748b",
-        "wrap": True,
-        "margin": "md"
-    })
     return {
         "type": "flex",
         "altText": "อัปเดตสถานะ Ticket ของคุณ",
@@ -843,6 +708,7 @@ def update_status():
         
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
+    note = data.get("note", "")  # รับหมายเหตุจาก frontend
 
     if not ticket_id or not new_status:
         return jsonify({"error": "ticket_id and status required"}), 400
@@ -860,11 +726,11 @@ def update_status():
             ticket.status = new_status
             ticket.subgroup = data.get('subgroup', ticket.subgroup)
 
-            # Determine who performed the change (either supplied in payload or from JWT token)
+            # Determine who performed the change
             actor = data.get("changed_by")
             if not actor:
                 try:
-                    current_user = get_jwt_identity()  # may fail if no valid JWT context
+                    current_user = get_jwt_identity()
                     if isinstance(current_user, dict):
                         actor = current_user.get("name") or current_user.get("pin")
                     else:
@@ -872,28 +738,29 @@ def update_status():
                 except Exception:
                     actor = "admin"
 
-            # Create a log entry for this status change
+            # Create a log entry for this status change with note
             log_entry = TicketStatusLog(
                 ticket_id=ticket.ticket_id,
                 old_status=current_status,
                 new_status=new_status,
                 changed_by=actor,
-                changed_at=datetime.utcnow()
+                changed_at=datetime.utcnow(),
+                note=note  # บันทึกหมายเหตุ
             )
             db.session.add(log_entry)
 
-            # Create notification
-            notification = Notification()
-            notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
+            # Create notification with note if provided
+            notification_msg = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
+            if note:
+                notification_msg += f"\nหมายเหตุ: {note}"
+                
+            notification = Notification(message=notification_msg)
             db.session.add(notification)
 
             db.session.commit()
             
-            # Logging ก่อนส่ง LINE Notify
-            print(f"[LINE Notify] Attempting to send notification for ticket {ticket_id} (Type: {ticket.type}, User ID: {ticket.user_id})")
-            # ส่ง LINE notification สำหรับทุกประเภท Ticket ที่มี user_id
+            # ส่ง LINE notification
             if ticket.user_id:
-                print(f"[LINE Notify] Sending notification to user {ticket.user_id}")
                 payload = {
                     'ticket_id': ticket.ticket_id,
                     'user_id': ticket.user_id,
@@ -908,12 +775,15 @@ def update_status():
                     'report': ticket.report,
                     'type': ticket.type,
                     'textbox': ticket.textbox,
+                    'note': note  # ส่งหมายเหตุไปด้วย
                 }
-                notify_user(payload)  # เรียกใช้ฟังก์ชันส่ง notification
-            else:
-                print(f"[LINE Notify] No user_id found, skipping LINE notification")
+                notify_user(payload)
                 
-            return jsonify({"message": "Status updated in PostgreSQL"})
+            return jsonify({
+                "success": True,
+                "message": "Status updated with note",
+                "note": note
+            })
         else:
             return jsonify({"message": "Status unchanged"})
             
