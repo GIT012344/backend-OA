@@ -206,6 +206,7 @@ def send_textbox_message(user_id, message_text):
 def notify_user(payload):
     # ตรวจสอบและกำหนดค่าเริ่มต้นสำหรับฟิลด์ที่อาจเป็น None
     payload['report'] = payload.get('report') if payload.get('report') is not None else 'ไม่มีข้อมูล'
+    payload['requested'] = payload.get('requested') if payload.get('requested') is not None else 'ไม่มีข้อมูล'
     payload['textbox'] = payload.get('textbox') if payload.get('textbox') is not None else 'ไม่มีข้อมูล'
     payload['subgroup'] = payload.get('subgroup') if payload.get('subgroup') is not None else 'ไม่มีข้อมูล'
     # Log payload หลังจากแก้ไขแล้ว
@@ -244,9 +245,14 @@ def create_flex_message(payload):
     }.get(status, '#666666')
     # Logging payload type
     print(f"[create_flex_message] payload type: {payload.get('type')}")
-    report_text = payload.get('report', 'ไม่มีข้อมูล')
-    if report_text is None:
-        report_text = 'ไม่มีข้อมูล'
+    # ตรวจสอบประเภท Ticket ก่อนแสดงปัญหา
+    ticket_type = (payload.get('type') or '').upper()
+    if ticket_type == 'SERVICE':
+        problem_text = payload.get('requested', 'ไม่มีข้อมูล')
+    else:
+        problem_text = payload.get('report', 'ไม่มีข้อมูล')
+    if problem_text is None:
+        problem_text = 'ไม่มีข้อมูล'
     return {
         "type": "flex",
         "altText": "อัปเดตสถานะ Ticket ของคุณ",
@@ -422,7 +428,7 @@ def create_flex_message(payload):
                             },
                             {
                                 "type": "text",
-                                "text": report_text,  # ใช้ค่าที่ตรวจสอบแล้ว
+                                "text": problem_text,  # ใช้ค่าที่ตรวจสอบแล้วตามประเภท Ticket
                                 "size": "sm",
                                 "flex": 4,
                                 "align": "end",
