@@ -2101,4 +2101,5 @@ if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
         create_ticket_status_logs_table()
+        db.create_all()  # <-- เพิ่มบรรทัดนี้เพื่อสร้างตารางใหม่ทั้งหมด รวมถึง StatusChangeRemark
     app.run(host='0.0.0.0', port=5001, debug=False)
