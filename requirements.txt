@@ -10,4 +10,5 @@ flask-jwt-extended
 bcrypt
 eventlet
 python-dateutil
+flask-socketio
 
