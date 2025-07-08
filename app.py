@@ -204,23 +204,22 @@ def send_textbox_message(user_id, message_text):
     return response.status_code == 200
 
 def notify_user(payload):
+    # ตรวจสอบและกำหนดค่าเริ่มต้นสำหรับฟิลด์ที่อาจเป็น None
+    payload['report'] = payload.get('report') if payload.get('report') is not None else 'ไม่มีข้อมูล'
+    payload['textbox'] = payload.get('textbox') if payload.get('textbox') is not None else 'ไม่มีข้อมูล'
+    payload['subgroup'] = payload.get('subgroup') if payload.get('subgroup') is not None else 'ไม่มีข้อมูล'
+    # Log payload หลังจากแก้ไขแล้ว
+    print(f"[notify_user] Final payload: {payload}")
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
     }
-
-    # Logging payload
-    print(f"[notify_user] payload: {payload}")
-
-    # สร้าง Flex Message จาก payload โดยไม่กรอง type
     flex_message = create_flex_message(payload)
-
     body = {
         "to": payload['user_id'],
         "messages": [flex_message]
     }
-
     response = requests.post(url, headers=headers, json=body)
     print(f"[notify_user] LINE API response: {response.status_code} {response.text}")
     return response.status_code == 200
@@ -243,10 +242,11 @@ def create_flex_message(payload):
         'On Hold': '#A020F0',       # ม่วง
         'Rejected': '#FF0000',      # แดง (ถ้ามี)
     }.get(status, '#666666')
-
     # Logging payload type
     print(f"[create_flex_message] payload type: {payload.get('type')}")
-
+    report_text = payload.get('report', 'ไม่มีข้อมูล')
+    if report_text is None:
+        report_text = 'ไม่มีข้อมูล'
     return {
         "type": "flex",
         "altText": "อัปเดตสถานะ Ticket ของคุณ",
@@ -422,7 +422,7 @@ def create_flex_message(payload):
                             },
                             {
                                 "type": "text",
-                                "text": payload.get('report', 'ไม่มีข้อมูล'),
+                                "text": report_text,  # ใช้ค่าที่ตรวจสอบแล้ว
                                 "size": "sm",
                                 "flex": 4,
                                 "align": "end",
