@@ -14,7 +14,7 @@ from flask_jwt_extended import (
 from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
 
-LINE_ACCESS_TOKEN = "SaXxPgiqWnhbTbwQRoJDnvALTrp+ymslDXHUUo/+Tg1VeqzyGZu7iATjq0EiMYiSGAYKmiuMntQTaOuet4VUiz349QnmJXrKrYWR5k+PDDM1QRebmq5N2Z0kWsmDNBa+3EKmFQUAtuq9SYnXp97+ywdB04t89/1O/w1cDnyilFU="
+LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
@@ -140,7 +140,7 @@ class TicketStatusLog(db.Model):
             'changed_by': self.changed_by,
             'changed_at': self.get_thai_time().isoformat() if self.changed_at else None,
             'changed_at_utc': self.changed_at.isoformat() if self.changed_at else None,
-            'note': self.note,
+            'note': self.note
             'remarks': self.remarks
         }
 
