@@ -65,6 +65,7 @@ class Notification(db.Model):
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     read = db.Column(db.Boolean, default=False)
+    extra_data = db.Column(db.JSON)  # เปลี่ยนชื่อจาก metadata เป็น extra_data
     
     def get_thai_time(self):
         # Convert stored UTC time to Thai time when retrieving
@@ -78,7 +79,8 @@ class Notification(db.Model):
             'message': self.message,
             'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None,
-            'read': self.read
+            'read': self.read,
+            'extra_data': self.extra_data
         }
 
 class Message(db.Model):
@@ -756,7 +758,8 @@ def update_status():
             if note:
                 notification_msg += f"\nหมายเหตุ: {note}"
                 
-            notification = Notification(message=notification_msg)
+            notification = Notification()
+            notification.message = notification_msg
             db.session.add(notification)
 
             db.session.commit()
@@ -1315,7 +1318,8 @@ def update_ticket():
             db.session.add(log_entry)
 
             # สร้าง Notification ภายในระบบ
-            notification = Notification(message=f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}")
+            notification = Notification()
+            notification.message = f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}"
             db.session.add(notification)
 
         # ถ้า status ใหม่เป็น Cancelled ให้ลบ ticket และ message ที่เกี่ยวข้องทันที
@@ -1942,7 +1946,8 @@ def update_status_with_note():
             if note:
                 notification_msg += f"\nหมายเหตุ: {note}"
                 
-            notification = Notification(message=notification_msg)
+            notification = Notification()
+            notification.message = notification_msg
             db.session.add(notification)
             db.session.commit()
             
@@ -1976,6 +1981,99 @@ def update_status_with_note():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/check-new-messages', methods=['GET'])
+@jwt_required()
+def check_new_messages():
+    try:
+        # ตรวจสอบข้อความที่ยังไม่ได้อ่าน (สำหรับ admin)
+        last_checked = request.args.get('last_checked')
+        if last_checked:
+            try:
+                last_checked = datetime.fromisoformat(last_checked)
+            except ValueError:
+                last_checked = None
+        
+        query = Message.query.filter(
+            Message.sender_type == 'user',
+            Message.admin_id.is_(None)  # ยังไม่มี admin ตอบ
+        )
+        
+        if last_checked:
+            query = query.filter(Message.timestamp > last_checked)
+        
+        new_messages = query.order_by(Message.timestamp.desc()).limit(50).all()
+        
+        # รวมข้อความจากผู้ใช้เดียวกัน
+        grouped_messages = {}
+        for msg in new_messages:
+            if msg.user_id not in grouped_messages:
+                user = Ticket.query.filter_by(user_id=msg.user_id).first()
+                grouped_messages[msg.user_id] = {
+                    'user_id': msg.user_id,
+                    'name': user.name if user else 'Unknown User',
+                    'messages': [],
+                    'latest_timestamp': msg.timestamp
+                }
+            grouped_messages[msg.user_id]['messages'].append({
+                'id': msg.id,
+                'message': msg.message,
+                'timestamp': msg.timestamp.isoformat()
+            })
+        
+        # สร้าง notification สำหรับข้อความใหม่
+        for user_id, data in grouped_messages.items():
+            latest_msg = data['messages'][0]['message']
+            notification = Notification()
+            notification.message = f"New message from {data['name']}: {latest_msg[:50]}..."
+            notification.read = False
+            notification.extra_data = {
+                'type': 'new_message',
+                'user_id': user_id,
+                'message_id': data['messages'][0]['id']
+            }
+            db.session.add(notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'new_messages': list(grouped_messages.values()),
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/migrate-notification-extra-data', methods=['POST'])
+def migrate_notification_extra_data():
+    """
+    Migration สำหรับเปลี่ยนชื่อ column 'metadata' เป็น 'extra_data' ในตาราง notifications (PostgreSQL)
+    """
+    import psycopg2
+    try:
+        conn = psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
+            host=DB_HOST, port=DB_PORT
+        )
+        cur = conn.cursor()
+        # ตรวจสอบว่ามี column 'metadata' อยู่จริง
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name='notifications' AND column_name='metadata';
+        """)
+        if cur.fetchone():
+            # ถ้ามี metadata ให้เปลี่ยนชื่อเป็น extra_data
+            cur.execute('ALTER TABLE notifications RENAME COLUMN metadata TO extra_data;')
+            conn.commit()
+            msg = "Migration success: เปลี่ยนชื่อ column 'metadata' เป็น 'extra_data' แล้ว"
+        else:
+            msg = "ไม่มี column 'metadata' ในตาราง notifications ไม่ต้อง migrate"
+        conn.close()
+        return jsonify({"success": True, "message": msg})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 if __name__ == '__main__':
     with app.app_context():
