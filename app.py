@@ -1450,38 +1450,53 @@ def get_messages():
     ]
     return jsonify(result)
 
+
 @app.route('/api/messages', methods=['POST'])
 def send_message():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
+        
     user_id = data.get('user_id')
     admin_id = data.get('admin_id')
     sender_type = data.get('sender_type')
     message = data.get('message')
+    sender_name = data.get('sender_name')  # เพิ่มฟิลด์ sender_name
+    
     if not user_id or not sender_type or not message:
         return jsonify({"error": "user_id, sender_type, and message are required"}), 400
+        
     if sender_type not in ['user', 'admin']:
         return jsonify({"error": "sender_type must be 'user' or 'admin'"}), 400
-    msg = Message()
-    msg.user_id = user_id
-    msg.admin_id = admin_id
-    msg.sender_type = sender_type
-    msg.message = message
-    # กำหนด timestamp เป็นเวลาปัจจุบัน (UTC) เสมอ
-    msg.timestamp = datetime.utcnow()
+        
+    msg = Message(
+        user_id=user_id,
+        admin_id=admin_id,
+        sender_type=sender_type,
+        sender_name=sender_name,  # บันทึกชื่อผู้ส่ง
+        message=message,
+        is_admin_message=(sender_type == 'admin'),
+        is_read=(sender_type == 'admin')  # ข้อความจาก admin จะถูกอ่านทันที
+    )
+    
     db.session.add(msg)
+    
+    # สร้างการแจ้งเตือนถ้าเป็นข้อความจากผู้ใช้
+    if sender_type == 'user':
+        notification = Notification(
+            message=f"ข้อความใหม่จาก {sender_name}: {message[:50]}...",
+            read=False
+        )
+        db.session.add(notification)
+    
     db.session.commit()
-    # ถ้าเป็น admin ส่งข้อความ ให้ push ข้อความไป LINE user ด้วย
+    
+    # ส่ง LINE notification ถ้าเป็น admin ตอบกลับ
     if sender_type == 'admin':
         send_textbox_message(user_id, message)
+        
     return jsonify({
         "id": msg.id,
-        "user_id": msg.user_id,
-        "admin_id": msg.admin_id,
-        "sender_type": msg.sender_type,
-        "message": msg.message,
-        "timestamp": msg.timestamp.isoformat(),
         "success": True
     })
 
