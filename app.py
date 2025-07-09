@@ -13,6 +13,7 @@ from flask_jwt_extended import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
+from flask_socketio import SocketIO, emit
 
 LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
 
@@ -1472,6 +1473,32 @@ def send_message():
     msg.timestamp = datetime.utcnow()
     db.session.add(msg)
     db.session.commit()
+    # ส่ง event ผ่าน WebSocket เมื่อมีข้อความใหม่
+    if sender_type == 'user':
+        socketio.emit('new_message', {
+            'id': msg.id,
+            'user_id': msg.user_id,
+            'admin_id': msg.admin_id,
+            'sender_type': msg.sender_type,
+            'message': msg.message,
+            'timestamp': msg.timestamp.isoformat(),
+            'user_name': data.get('user_name', 'Unknown User')
+        })
+        # สร้าง notification
+        notification = Notification(
+            message=f"New message from {data.get('user_name', 'Unknown User')}: {message[:50]}...",
+            read=False
+        )
+        db.session.add(notification)
+        db.session.commit()
+        # ส่ง event แจ้งเตือนใหม่
+        socketio.emit('new_notification', {
+            'id': notification.id,
+            'message': notification.message,
+            'timestamp': notification.timestamp.isoformat(),
+            'read': notification.read,
+            'related_user_id': user_id
+        })
     # ถ้าเป็น admin ส่งข้อความ ให้ push ข้อความไป LINE user ด้วย
     if sender_type == 'admin':
         send_textbox_message(user_id, message)
@@ -1977,8 +2004,28 @@ def update_status_with_note():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# หลังจากสร้าง Flask app
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# เพิ่ม endpoint สำหรับดึงข้อมูลผู้ใช้
+@app.route('/api/user/<user_id>', methods=['GET'])
+def get_user_info(user_id):
+    try:
+        user = Ticket.query.filter_by(user_id=user_id).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        return jsonify({
+            "user_id": user.user_id,
+            "name": user.name,
+            "email": user.email,
+            "phone": user.phone,
+            "department": user.department
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
         create_ticket_status_logs_table()
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False)
