@@ -2071,8 +2071,23 @@ def sync_messages_to_notifications():
     db.session.commit()
     return jsonify({"success": True, "synced_count": synced_count})
 
+def auto_sync_messages_to_notifications():
+    synced_count = 0
+    messages = Message.query.order_by(Message.timestamp.asc()).all()
+    for msg in messages:
+        notif_text = f"New message from {getattr(msg, 'sender_name', None) or msg.user_id}: {msg.message}"
+        exists = Notification.query.filter_by(message=notif_text).first()
+        if not exists:
+            notification = Notification(message=notif_text)
+            notification.timestamp = msg.timestamp
+            db.session.add(notification)
+            synced_count += 1
+    db.session.commit()
+    print(f"[auto_sync_messages_to_notifications] Synced {synced_count} messages to notifications.")
+
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
         create_ticket_status_logs_table()
+        auto_sync_messages_to_notifications()
     app.run(host='0.0.0.0', port=5001, debug=False)
