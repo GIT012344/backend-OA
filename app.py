@@ -2058,6 +2058,22 @@ def fix_null_sender_type():
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/sync-messages-to-notifications', methods=['POST'])
+def sync_messages_to_notifications():
+    synced_count = 0
+    messages = Message.query.order_by(Message.timestamp.asc()).all()
+    for msg in messages:
+        # ตรวจสอบว่ามี notification นี้แล้วหรือยัง (กันซ้ำ)
+        notif_text = f"New message from {msg.sender_name or msg.user_id}: {msg.message}"
+        exists = Notification.query.filter_by(message=notif_text).first()
+        if not exists:
+            notification = Notification(message=notif_text)
+            notification.timestamp = msg.timestamp
+            db.session.add(notification)
+            synced_count += 1
+    db.session.commit()
+    return jsonify({"success": True, "synced_count": synced_count})
+
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
