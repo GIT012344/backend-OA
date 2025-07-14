@@ -974,18 +974,17 @@ def update_textbox():
             new_message.sender_type = sender_type
             new_message.message = new_text
             db.session.add(new_message)
+            # --- Trigger: สร้าง Notification อัตโนมัติ ---
+            notif_text = f"New message from {getattr(new_message, 'sender_name', None) or new_message.user_id}: {new_message.message}"
+            notification = Notification(message=notif_text)
+            notification.timestamp = new_message.timestamp
+            db.session.add(notification)
             
             # Update textbox ในตาราง tickets
             ticket.textbox = new_text
             
             # Create notification (ไม่สร้าง notification สำหรับประกาศ)
-            if not is_announcement:
-                if sender_type == 'admin':
-                    notif_msg = f"New message from admin to user {ticket_id}: {new_text}"
-                else:
-                    notif_msg = f"New message from user {ticket_id}: {new_text}"
-                notification = Notification(message=notif_msg)
-                db.session.add(notification)
+            # (ลบ logic เดิมที่สร้าง notification ซ้ำ)
             
             # Send LINE message if user_id exists
             if ticket.user_id and not is_announcement:
@@ -994,7 +993,7 @@ def update_textbox():
             db.session.commit()
             
         return jsonify({"message": "Message saved and textbox updated in PostgreSQL"})
-        
+            
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -1492,12 +1491,10 @@ def send_message():
     msg.message = message
     msg.timestamp = datetime.utcnow()
     db.session.add(msg)
-    # --- เพิ่ม Notification ทุกครั้งที่มีข้อความใหม่ ---
-    if sender_type == 'admin':
-        notif_msg = f"New message from admin to user {user_id}: {message}"
-    else:
-        notif_msg = f"New message from user {user_id}: {message}"
-    notification = Notification(message=notif_msg)
+    # --- Trigger: สร้าง Notification อัตโนมัติ ---
+    notif_text = f"New message from {getattr(msg, 'sender_name', None) or msg.user_id}: {msg.message}"
+    notification = Notification(message=notif_text)
+    notification.timestamp = msg.timestamp
     db.session.add(notification)
     db.session.commit()
     if sender_type == 'admin':
