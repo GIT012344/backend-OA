@@ -13,6 +13,7 @@ from flask_jwt_extended import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
+from sqlalchemy import desc
 
 LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
 
@@ -1987,6 +1988,43 @@ def update_status_with_note():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/check-new-messages', methods=['GET'])
+def check_new_messages():
+    # รับ last_checked เป็น ISO8601 string
+    last_checked = request.args.get('last_checked')
+    if not last_checked:
+        return jsonify({"error": "last_checked required"}), 400
+
+    try:
+        last_checked_dt = datetime.fromisoformat(last_checked)
+    except Exception:
+        return jsonify({"error": "Invalid last_checked format"}), 400
+
+    # ดึงเฉพาะข้อความใหม่ที่ sender_type == 'user' และ timestamp > last_checked
+    new_msgs = (
+        Message.query
+        .filter(Message.sender_type == 'user', Message.timestamp > last_checked_dt)
+        .order_by(desc(Message.timestamp))
+        .all()
+    )
+    # รวมกลุ่มตาม user_id
+    user_map = {}
+    for msg in new_msgs:
+        if msg.user_id not in user_map:
+            user_map[msg.user_id] = {
+                "user_id": msg.user_id,
+                "messages": [],
+                "name": None  # จะเติมชื่อจาก ticket
+            }
+        user_map[msg.user_id]["messages"].append(msg.to_dict())
+
+    # เติมชื่อผู้ใช้จาก ticket
+    for user_id in user_map:
+        ticket = Ticket.query.filter_by(ticket_id=user_id).first()
+        user_map[user_id]["name"] = ticket.name if ticket else user_id
+
+    return jsonify({"new_messages": list(user_map.values())})
 
 if __name__ == '__main__':
     with app.app_context():
