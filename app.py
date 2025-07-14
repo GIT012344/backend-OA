@@ -67,6 +67,10 @@ class Notification(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     read = db.Column(db.Boolean, default=False)
     
+    def __init__(self, message, read=False, **kwargs):
+        super().__init__(**kwargs)
+        self.message = message
+        self.read = read
     def get_thai_time(self):
         # Convert stored UTC time to Thai time when retrieving
         if self.timestamp:
@@ -821,8 +825,7 @@ def delete_ticket():
         db.session.delete(ticket)
         
         # 3. สร้าง notification
-        notification = Notification()
-        notification.message = f"Ticket {ticket_id} has been deleted"
+        notification = Notification(message=f"Ticket {ticket_id} has been deleted")
         db.session.add(notification)
         
         db.session.commit()
@@ -1055,9 +1058,7 @@ def send_announcement():
                     recipient_count += 1
 
         # Create notification
-        notification = Notification()
-        notification.message = f"New announcement: {message}"
-        notification.read = False
+        notification = Notification(message=f"New announcement: {message}", read=False)
         db.session.add(notification)
         db.session.commit()
 
@@ -1339,8 +1340,7 @@ def update_ticket():
             Message.query.filter_by(user_id=ticket_id).delete()
             db.session.delete(ticket)
             # สร้าง notification
-            notification = Notification()
-            notification.message = f"Ticket {ticket_id} has been cancelled and deleted."
+            notification = Notification(message=f"Ticket {ticket_id} has been cancelled and deleted.")
             db.session.add(notification)
             db.session.commit()
             return jsonify({
