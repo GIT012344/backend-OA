@@ -636,7 +636,7 @@ def auth_status():
         return jsonify({"authenticated": False, "message": "Server error"}), 500
 
 @app.route('/api/data')
-@cache.cached(timeout=60) 
+@cache.cached(timeout=60, query_string=True) 
 def get_data():
     try:
         # Use SQLAlchemy to query tickets
@@ -761,7 +761,17 @@ def update_status():
             db.session.add(notification)
 
             db.session.commit()
-            
+            # Clear cache so that clients receive the latest data immediately after an update
+            try:
+                # Attempt to remove specifically memoized get_data and get_appointments endpoints
+                if 'get_data' in globals():
+                    cache.delete_memoized(get_data)
+                cache.delete_memoized(get_appointments)
+            except Exception as cache_err:
+                # As a fallback (e.g. when running with SimpleCache) clear all cache
+                cache.clear()
+                print(f"[update_status] Cache clear fallback triggered: {cache_err}")
+
             # ส่ง LINE notification
             if ticket.user_id:
                 payload = {
@@ -1982,4 +1992,4 @@ if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
         create_ticket_status_logs_table()
-    app.run(host='0.0.0.0', port=5001, debug=False) 
+    app.run(host='0.0.0.0', port=5001, debug=False)
