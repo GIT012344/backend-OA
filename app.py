@@ -2072,18 +2072,22 @@ def sync_messages_to_notifications():
     return jsonify({"success": True, "synced_count": synced_count})
 
 def auto_sync_messages_to_notifications():
-    synced_count = 0
-    messages = Message.query.order_by(Message.timestamp.asc()).all()
-    for msg in messages:
-        notif_text = f"New message from {getattr(msg, 'sender_name', None) or msg.user_id}: {msg.message}"
-        exists = Notification.query.filter_by(message=notif_text).first()
-        if not exists:
-            notification = Notification(message=notif_text)
-            notification.timestamp = msg.timestamp
-            db.session.add(notification)
-            synced_count += 1
-    db.session.commit()
-    print(f"[auto_sync_messages_to_notifications] Synced {synced_count} messages to notifications.")
+    try:
+        synced_count = 0
+        messages = Message.query.order_by(Message.timestamp.asc()).all()
+        print(f"[DEBUG] Found {len(messages)} messages in table.")
+        for msg in messages:
+            notif_text = f"New message from {getattr(msg, 'sender_name', None) or msg.user_id}: {msg.message}"
+            exists = Notification.query.filter_by(message=notif_text).first()
+            if not exists:
+                notification = Notification(message=notif_text)
+                notification.timestamp = msg.timestamp
+                db.session.add(notification)
+                synced_count += 1
+        db.session.commit()
+        print(f"[auto_sync_messages_to_notifications] Synced {synced_count} messages to notifications.")
+    except Exception as e:
+        print(f"[ERROR] auto_sync_messages_to_notifications: {e}")
 
 if __name__ == '__main__':
     with app.app_context():
