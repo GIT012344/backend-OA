@@ -2089,9 +2089,15 @@ def auto_sync_messages_to_notifications():
     except Exception as e:
         print(f"[ERROR] auto_sync_messages_to_notifications: {e}")
 
+# เรียก auto_sync_messages_to_notifications ทุกครั้งที่ import app.py (production/gunicorn ก็รัน)
+with app.app_context():
+    try:
+        auto_sync_messages_to_notifications()
+    except Exception as e:
+        print(f"[ERROR] auto_sync_messages_to_notifications (import time): {e}")
+
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
         create_ticket_status_logs_table()
-        auto_sync_messages_to_notifications()
     app.run(host='0.0.0.0', port=5001, debug=False)
