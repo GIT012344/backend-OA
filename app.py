@@ -398,16 +398,7 @@ def create_flex_message(payload):
 def get_notifications():
     # Get last 20 notifications, newest first using SQLAlchemy
     notifications = Notification.query.order_by(Notification.timestamp.desc()).limit(20).all()
-    
-    result = []
-    for notification in notifications:
-        result.append({
-            "id": notification.id,
-            "message": notification.message,
-            "timestamp": notification.timestamp.isoformat(),
-            "read": notification.read
-        })
-    
+    result = [n.to_dict() for n in notifications]
     return jsonify(result)
 
 # Add a route to mark notifications as read
@@ -986,8 +977,11 @@ def update_textbox():
             
             # Create notification (ไม่สร้าง notification สำหรับประกาศ)
             if not is_announcement:
-                notification = Notification()
-                notification.message = f"New message for ticket {ticket_id} ({ticket.name}): {new_text}"
+                if sender_type == 'admin':
+                    notif_msg = f"New message from admin to user {ticket_id}: {new_text}"
+                else:
+                    notif_msg = f"New message from user {ticket_id}: {new_text}"
+                notification = Notification(message=notif_msg)
                 db.session.add(notification)
             
             # Send LINE message if user_id exists
@@ -1498,6 +1492,13 @@ def send_message():
     msg.message = message
     msg.timestamp = datetime.utcnow()
     db.session.add(msg)
+    # --- เพิ่ม Notification ทุกครั้งที่มีข้อความใหม่ ---
+    if sender_type == 'admin':
+        notif_msg = f"New message from admin to user {user_id}: {message}"
+    else:
+        notif_msg = f"New message from user {user_id}: {message}"
+    notification = Notification(message=notif_msg)
+    db.session.add(notification)
     db.session.commit()
     if sender_type == 'admin':
         send_textbox_message(user_id, message)
