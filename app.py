@@ -116,10 +116,9 @@ class TicketStatusLog(db.Model):
     changed_by = db.Column(db.String, nullable=False)
     changed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     note = db.Column(db.Text)
-    remarks = db.Column(db.Text)   # เพิ่มฟิลด์สำหรับเก็บหมายเหตุ (ไม่กระทบ logic เดิม)
+    remarks = db.Column(db.Text)   
     
     def __init__(self, **kwargs):
-        # Convert any provided datetime to UTC before saving
         if 'changed_at' in kwargs and kwargs['changed_at']:
             if kwargs['changed_at'].tzinfo is not None:
                 kwargs['changed_at'] = kwargs['changed_at'].astimezone(timezone.utc).replace(tzinfo=None)
@@ -711,6 +710,7 @@ def update_status():
     ticket_id = data.get("ticket_id")
     new_status = data.get("status")
     note = data.get("note", "")  # รับหมายเหตุจาก frontend
+    remarks = data.get("remarks", "")  # หมายเหตุเพิ่มเติมจาก frontend (ถ้ามี)
 
     if not ticket_id or not new_status:
         return jsonify({"error": "ticket_id and status required"}), 400
@@ -747,7 +747,8 @@ def update_status():
                 new_status=new_status,
                 changed_by=actor,
                 changed_at=datetime.utcnow(),
-                note=note  # บันทึกหมายเหตุ
+                note=note,
+                remarks=remarks
             )
             db.session.add(log_entry)
 
@@ -777,14 +778,16 @@ def update_status():
                     'report': ticket.report,
                     'type': ticket.type,
                     'textbox': ticket.textbox,
-                    'note': note  # ส่งหมายเหตุไปด้วย
+                    'note': note,  # ส่งหมายเหตุไปด้วย
+                    'remarks': remarks
                 }
                 notify_user(payload)
                 
             return jsonify({
                 "success": True,
                 "message": "Status updated with note",
-                "note": note
+                "note": note,
+                "remarks": remarks
             })
         else:
             return jsonify({"message": "Status unchanged"})
@@ -1450,53 +1453,38 @@ def get_messages():
     ]
     return jsonify(result)
 
-
 @app.route('/api/messages', methods=['POST'])
 def send_message():
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
-        
     user_id = data.get('user_id')
     admin_id = data.get('admin_id')
     sender_type = data.get('sender_type')
     message = data.get('message')
-    sender_name = data.get('sender_name')  # เพิ่มฟิลด์ sender_name
-    
     if not user_id or not sender_type or not message:
         return jsonify({"error": "user_id, sender_type, and message are required"}), 400
-        
     if sender_type not in ['user', 'admin']:
         return jsonify({"error": "sender_type must be 'user' or 'admin'"}), 400
-        
-    msg = Message(
-        user_id=user_id,
-        admin_id=admin_id,
-        sender_type=sender_type,
-        sender_name=sender_name,  # บันทึกชื่อผู้ส่ง
-        message=message,
-        is_admin_message=(sender_type == 'admin'),
-        is_read=(sender_type == 'admin')  # ข้อความจาก admin จะถูกอ่านทันที
-    )
-    
+    msg = Message()
+    msg.user_id = user_id
+    msg.admin_id = admin_id
+    msg.sender_type = sender_type
+    msg.message = message
+    # กำหนด timestamp เป็นเวลาปัจจุบัน (UTC) เสมอ
+    msg.timestamp = datetime.utcnow()
     db.session.add(msg)
-    
-    # สร้างการแจ้งเตือนถ้าเป็นข้อความจากผู้ใช้
-    if sender_type == 'user':
-        notification = Notification(
-            message=f"ข้อความใหม่จาก {sender_name}: {message[:50]}...",
-            read=False
-        )
-        db.session.add(notification)
-    
     db.session.commit()
-    
-    # ส่ง LINE notification ถ้าเป็น admin ตอบกลับ
+    # ถ้าเป็น admin ส่งข้อความ ให้ push ข้อความไป LINE user ด้วย
     if sender_type == 'admin':
         send_textbox_message(user_id, message)
-        
     return jsonify({
         "id": msg.id,
+        "user_id": msg.user_id,
+        "admin_id": msg.admin_id,
+        "sender_type": msg.sender_type,
+        "message": msg.message,
+        "timestamp": msg.timestamp.isoformat(),
         "success": True
     })
 
@@ -1907,67 +1895,6 @@ def create_ticket_status_logs_table():
         if not inspector.has_table('ticket_status_logs'):
             db.create_all()
 
-@app.route('/api/check-new-messages', methods=['GET'])
-@jwt_required()
-def check_new_messages():
-    try:
-        # ตรวจสอบข้อความที่ยังไม่ได้อ่านและไม่ใช่ข้อความจาก admin
-        unread_messages = Message.query.filter(
-            Message.is_read == False,
-            Message.sender_type != 'admin'
-        ).order_by(Message.timestamp.desc()).limit(10).all()
-        
-        # แปลงเป็น dictionary
-        messages = []
-        for msg in unread_messages:
-            messages.append({
-                "id": msg.id,
-                "ticket_id": msg.ticket_id,
-                "user_id": msg.user_id,
-                "sender_name": msg.sender_name,
-                "message": msg.message,
-                "timestamp": msg.timestamp.isoformat(),
-                "is_admin_message": msg.is_admin_message
-            })
-            
-            # ทำเครื่องหมายว่าอ่านแล้ว
-            msg.is_read = True
-        
-        db.session.commit()
-        
-        return jsonify({
-            "success": True,
-            "new_messages": messages
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/mark-message-read', methods=['POST'])
-@jwt_required()
-def mark_message_read():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-        
-    message_id = data.get('message_id')
-    
-    if not message_id:
-        return jsonify({"error": "message_id is required"}), 400
-    
-    try:
-        message = Message.query.get(message_id)
-        if message:
-            message.is_read = True
-            db.session.commit()
-            return jsonify({"success": True})
-        else:
-            return jsonify({"error": "Message not found"}), 404
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/update-status-with-note', methods=['POST'])
 def update_status_with_note():
     data = request.get_json()
@@ -2008,9 +1935,7 @@ def update_status_with_note():
                 old_status=current_status,
                 new_status=new_status,
                 changed_by=actor,
-                changed_at=datetime.utcnow(),
-                note=note,
-                remarks=remarks
+                changed_at=datetime.utcnow()
             )
             db.session.add(log_entry)
             
@@ -2057,4 +1982,4 @@ if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
         create_ticket_status_logs_table()
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    app.run(host='0.0.0.0', port=5001, debug=False) 
