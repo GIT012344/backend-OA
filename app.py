@@ -87,7 +87,7 @@ class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.String, nullable=False)
     admin_id = db.Column(db.String, nullable=True)
-    sender_type = db.Column(db.String, nullable=False)  # 'user' or 'admin'
+    sender_type = db.Column(db.String, nullable=False)  # 'user' or 'admin', ป้องกัน null
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -950,8 +950,7 @@ def update_textbox():
     new_text = data.get("textbox")
     is_announcement = data.get("is_announcement", False)
     admin_id = data.get("admin_id")
-    sender_type = data.get("sender_type", "Admin"),
-    
+    sender_type = data.get("sender_type")
 
     if not ticket_id or new_text is None:
         return jsonify({"error": "ticket_id and text required"}), 400
@@ -967,6 +966,14 @@ def update_textbox():
         # Only proceed if text is actually changing
         if current_text != new_text:
             # บันทึกข้อความลงในตาราง messages ก่อน
+            # validation sender_type
+            if not sender_type:
+                if admin_id:
+                    sender_type = 'admin'
+                else:
+                    sender_type = 'user'
+            if sender_type not in ['user', 'admin']:
+                return jsonify({"error": "sender_type must be 'user' or 'admin'"}), 400
             new_message = Message()
             new_message.user_id = ticket_id
             new_message.admin_id = admin_id
@@ -1473,8 +1480,15 @@ def send_message():
     admin_id = data.get('admin_id')
     sender_type = data.get('sender_type')
     message = data.get('message')
-    if not user_id or not sender_type or not message:
-        return jsonify({"error": "user_id, sender_type, and message are required"}), 400
+    if not user_id or not message:
+        return jsonify({"error": "user_id and message are required"}), 400
+    # validation sender_type
+    if not sender_type:
+        # ถ้า admin_id มีค่า ให้ default เป็น 'admin' ถ้าไม่มีก็ 'user'
+        if admin_id:
+            sender_type = 'admin'
+        else:
+            sender_type = 'user'
     if sender_type not in ['user', 'admin']:
         return jsonify({"error": "sender_type must be 'user' or 'admin'"}), 400
     msg = Message()
@@ -1482,11 +1496,9 @@ def send_message():
     msg.admin_id = admin_id
     msg.sender_type = sender_type
     msg.message = message
-    # กำหนด timestamp เป็นเวลาปัจจุบัน (UTC) เสมอ
     msg.timestamp = datetime.utcnow()
     db.session.add(msg)
     db.session.commit()
-    # ถ้าเป็น admin ส่งข้อความ ให้ push ข้อความไป LINE user ด้วย
     if sender_type == 'admin':
         send_textbox_message(user_id, message)
     return jsonify({
@@ -2025,6 +2037,25 @@ def check_new_messages():
         user_map[user_id]["name"] = ticket.name if ticket else user_id
 
     return jsonify({"new_messages": list(user_map.values())})
+
+# เพิ่ม endpoint สำหรับแก้ sender_type ที่เป็น null ในฐานข้อมูล (ใช้สำหรับแก้ข้อมูลเก่า)
+@app.route('/api/fix-null-sender-type', methods=['POST'])
+def fix_null_sender_type():
+    try:
+        from sqlalchemy import text
+        # update sender_type = 'admin' ถ้า admin_id ไม่เป็น null
+        db.session.execute(text("""
+            UPDATE messages SET sender_type = 'admin' WHERE sender_type IS NULL AND admin_id IS NOT NULL;
+        """))
+        # update sender_type = 'user' ถ้า admin_id เป็น null
+        db.session.execute(text("""
+            UPDATE messages SET sender_type = 'user' WHERE sender_type IS NULL AND admin_id IS NULL;
+        """))
+        db.session.commit()
+        return jsonify({"success": True, "message": "Fixed null sender_type in messages table"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():
