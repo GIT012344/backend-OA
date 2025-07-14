@@ -66,11 +66,17 @@ class Notification(db.Model):
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     read = db.Column(db.Boolean, default=False)
+    sender_name = db.Column(db.String, nullable=True)  # เพิ่ม
+    user_id = db.Column(db.String, nullable=True)      # เพิ่ม
+    meta_data = db.Column(db.JSON, nullable=True)       # เปลี่ยนชื่อ field
     
-    def __init__(self, message, read=False, **kwargs):
+    def __init__(self, message, read=False, sender_name=None, user_id=None, meta_data=None, **kwargs):
         super().__init__(**kwargs)
         self.message = message
         self.read = read
+        self.sender_name = sender_name
+        self.user_id = user_id
+        self.meta_data = meta_data
     def get_thai_time(self):
         # Convert stored UTC time to Thai time when retrieving
         if self.timestamp:
@@ -83,7 +89,10 @@ class Notification(db.Model):
             'message': self.message,
             'timestamp': self.get_thai_time().isoformat() if self.timestamp else None,
             'timestamp_utc': self.timestamp.isoformat() if self.timestamp else None,
-            'read': self.read
+            'read': self.read,
+            'sender_name': self.sender_name,
+            'user_id': self.user_id,
+            'meta_data': self.meta_data,
         }
 
 class Message(db.Model):
@@ -974,17 +983,18 @@ def update_textbox():
             new_message.sender_type = sender_type
             new_message.message = new_text
             db.session.add(new_message)
-            # --- Trigger: สร้าง Notification อัตโนมัติ ---
-            notif_text = f"New message from {getattr(new_message, 'sender_name', None) or new_message.user_id}: {new_message.message}"
-            notification = Notification(message=notif_text)
-            notification.timestamp = new_message.timestamp
-            db.session.add(notification)
             
             # Update textbox ในตาราง tickets
             ticket.textbox = new_text
             
             # Create notification (ไม่สร้าง notification สำหรับประกาศ)
-            # (ลบ logic เดิมที่สร้าง notification ซ้ำ)
+            if not is_announcement:
+                if sender_type == 'admin':
+                    notif_msg = f"New message from admin to user {ticket_id}: {new_text}"
+                else:
+                    notif_msg = f"New message from user {ticket_id}: {new_text}"
+                notification = Notification(message=notif_msg)
+                db.session.add(notification)
             
             # Send LINE message if user_id exists
             if ticket.user_id and not is_announcement:
@@ -993,7 +1003,7 @@ def update_textbox():
             db.session.commit()
             
         return jsonify({"message": "Message saved and textbox updated in PostgreSQL"})
-            
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -1491,11 +1501,21 @@ def send_message():
     msg.message = message
     msg.timestamp = datetime.utcnow()
     db.session.add(msg)
-    # --- Trigger: สร้าง Notification อัตโนมัติ ---
-    notif_text = f"New message from {getattr(msg, 'sender_name', None) or msg.user_id}: {msg.message}"
-    notification = Notification(message=notif_text)
-    notification.timestamp = msg.timestamp
-    db.session.add(notification)
+    # --- เพิ่ม Notification ทุกครั้งที่มีข้อความใหม่ ---
+    # ดึงชื่อผู้ใช้จาก ticket
+    ticket = Ticket.query.filter_by(ticket_id=user_id).first()
+    user_name = ticket.name if ticket else user_id
+    notif_msg = f"New message from {'admin' if sender_type == 'admin' else 'user'} to user {user_id}: {message}"
+    add_notification_to_db(
+        message=notif_msg,
+        sender_name=user_name,
+        user_id=user_id,
+        meta_data={
+            "type": "new_message",
+            "user_id": user_id,
+            "sender_name": user_name
+        }
+    )
     db.session.commit()
     if sender_type == 'admin':
         send_textbox_message(user_id, message)
@@ -2055,46 +2075,36 @@ def fix_null_sender_type():
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/sync-messages-to-notifications', methods=['POST'])
-def sync_messages_to_notifications():
-    synced_count = 0
-    messages = Message.query.order_by(Message.timestamp.asc()).all()
-    for msg in messages:
-        # ตรวจสอบว่ามี notification นี้แล้วหรือยัง (กันซ้ำ)
-        notif_text = f"New message from {msg.sender_name or msg.user_id}: {msg.message}"
-        exists = Notification.query.filter_by(message=notif_text).first()
-        if not exists:
-            notification = Notification(message=notif_text)
-            notification.timestamp = msg.timestamp
-            db.session.add(notification)
-            synced_count += 1
+# เพิ่ม endpoint สำหรับเพิ่ม notification โดยตรง (optional)
+@app.route('/api/add-notification', methods=['POST'])
+def api_add_notification():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    message = data.get('message')
+    sender_name = data.get('sender_name')
+    user_id = data.get('user_id')
+    meta_data = data.get('meta_data')
+    if not message or not sender_name:
+        return jsonify({"error": "message and sender_name are required"}), 400
+    notif = add_notification_to_db(message, sender_name, user_id, meta_data)
+    return jsonify({"success": True, "notification": notif.to_dict()})
+
+# ฟังก์ชันสำหรับบันทึก Notification ลงฐานข้อมูล
+from datetime import datetime
+
+def add_notification_to_db(message, sender_name, user_id=None, meta_data=None):
+    notif = Notification(
+        message=message,
+        timestamp=datetime.utcnow(),
+        read=False,
+        sender_name=sender_name,
+        user_id=user_id,
+        meta_data=meta_data if meta_data else None
+    )
+    db.session.add(notif)
     db.session.commit()
-    return jsonify({"success": True, "synced_count": synced_count})
-
-def auto_sync_messages_to_notifications():
-    try:
-        synced_count = 0
-        messages = Message.query.order_by(Message.timestamp.asc()).all()
-        print(f"[DEBUG] Found {len(messages)} messages in table.")
-        for msg in messages:
-            notif_text = f"New message from {getattr(msg, 'sender_name', None) or msg.user_id}: {msg.message}"
-            exists = Notification.query.filter_by(message=notif_text).first()
-            if not exists:
-                notification = Notification(message=notif_text)
-                notification.timestamp = msg.timestamp
-                db.session.add(notification)
-                synced_count += 1
-        db.session.commit()
-        print(f"[auto_sync_messages_to_notifications] Synced {synced_count} messages to notifications.")
-    except Exception as e:
-        print(f"[ERROR] auto_sync_messages_to_notifications: {e}")
-
-# เรียก auto_sync_messages_to_notifications ทุกครั้งที่ import app.py (production/gunicorn ก็รัน)
-with app.app_context():
-    try:
-        auto_sync_messages_to_notifications()
-    except Exception as e:
-        print(f"[ERROR] auto_sync_messages_to_notifications (import time): {e}")
+    return notif
 
 if __name__ == '__main__':
     with app.app_context():
