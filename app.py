@@ -761,9 +761,19 @@ def update_status():
             notification_msg = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
             if note:
                 notification_msg += f"\nหมายเหตุ: {note}"
-                
-            notification = Notification(message=notification_msg)
-            db.session.add(notification)
+            add_notification_to_db(
+                message=notification_msg,
+                sender_name=actor,
+                user_id=ticket.user_id,
+                meta_data={
+                    "type": "status_change",
+                    "ticket_id": ticket_id,
+                    "old_status": current_status,
+                    "new_status": new_status,
+                    "note": note,
+                    "remarks": remarks
+                }
+            )
 
             db.session.commit()
             # Clear cache so that clients receive the latest data immediately after an update
@@ -834,8 +844,12 @@ def delete_ticket():
         db.session.delete(ticket)
         
         # 3. สร้าง notification
-        notification = Notification(message=f"Ticket {ticket_id} has been deleted")
-        db.session.add(notification)
+        add_notification_to_db(
+            message=f"Ticket {ticket_id} has been deleted",
+            sender_name="system",
+            user_id=ticket_id,
+            meta_data={"type": "ticket_deleted", "ticket_id": ticket_id}
+        )
         
         db.session.commit()
 
@@ -993,8 +1007,16 @@ def update_textbox():
                     notif_msg = f"New message from admin to user {ticket_id}: {new_text}"
                 else:
                     notif_msg = f"New message from user {ticket_id}: {new_text}"
-                notification = Notification(message=notif_msg)
-                db.session.add(notification)
+                add_notification_to_db(
+                    message=notif_msg,
+                    sender_name=admin_id if sender_type == 'admin' else ticket.name,
+                    user_id=ticket_id,
+                    meta_data={
+                        "type": "new_message",
+                        "user_id": ticket_id,
+                        "sender_type": sender_type
+                    }
+                )
             
             # Send LINE message if user_id exists
             if ticket.user_id and not is_announcement:
@@ -1067,9 +1089,12 @@ def send_announcement():
                     recipient_count += 1
 
         # Create notification
-        notification = Notification(message=f"New announcement: {message}", read=False)
-        db.session.add(notification)
-        db.session.commit()
+        add_notification_to_db(
+            message=f"New announcement: {message}",
+            sender_name="system",
+            user_id=None,
+            meta_data={"type": "announcement"}
+        )
 
         return jsonify({
             "success": True,
@@ -1340,8 +1365,17 @@ def update_ticket():
             db.session.add(log_entry)
 
             # สร้าง Notification ภายในระบบ
-            notification = Notification(message=f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}")
-            db.session.add(notification)
+            add_notification_to_db(
+                message=f"Ticket #{ticket_id} ({ticket.name}) changed from {previous_status} to {ticket.status}",
+                sender_name=actor,
+                user_id=ticket.user_id,
+                meta_data={
+                    "type": "status_change",
+                    "ticket_id": ticket_id,
+                    "old_status": previous_status,
+                    "new_status": ticket.status
+                }
+            )
 
         # ถ้า status ใหม่เป็น Cancelled ให้ลบ ticket และ message ที่เกี่ยวข้องทันที
         if 'status' in data and data['status'] == 'Cancelled':
@@ -1349,8 +1383,12 @@ def update_ticket():
             Message.query.filter_by(user_id=ticket_id).delete()
             db.session.delete(ticket)
             # สร้าง notification
-            notification = Notification(message=f"Ticket {ticket_id} has been cancelled and deleted.")
-            db.session.add(notification)
+            add_notification_to_db(
+                message=f"Ticket {ticket_id} has been cancelled and deleted.",
+                sender_name="system",
+                user_id=ticket_id,
+                meta_data={"type": "ticket_cancelled", "ticket_id": ticket_id}
+            )
             db.session.commit()
             return jsonify({
                 "success": True,
@@ -1983,9 +2021,20 @@ def update_status_with_note():
             notification_msg = f"Ticket #{ticket_id} ({ticket.name}) changed from {current_status} to {new_status}"
             if note:
                 notification_msg += f"\nหมายเหตุ: {note}"
-                
-            notification = Notification(message=notification_msg)
-            db.session.add(notification)
+            add_notification_to_db(
+                message=notification_msg,
+                sender_name=actor,
+                user_id=ticket.user_id,
+                meta_data={
+                    "type": "status_change",
+                    "ticket_id": ticket_id,
+                    "old_status": current_status,
+                    "new_status": new_status,
+                    "note": note,
+                    "remarks": remarks
+                }
+            )
+            
             db.session.commit()
             
             if ticket.user_id:
