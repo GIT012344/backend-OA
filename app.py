@@ -2139,13 +2139,23 @@ def api_add_notification():
     notif = add_notification_to_db(message, sender_name, user_id, meta_data)
     return jsonify({"success": True, "notification": notif.to_dict()})
 
-# ฟังก์ชันสำหรับบันทึก Notification ลงฐานข้อมูล
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def add_notification_to_db(message, sender_name, user_id=None, meta_data=None):
+    now = datetime.utcnow()
+    # ตรวจสอบซ้ำ (เช่น 10 วินาที)
+    duplicate = Notification.query.filter(
+        Notification.user_id == user_id,
+        Notification.message == message,
+        Notification.sender_name == sender_name,
+        Notification.timestamp > now - timedelta(seconds=10)
+    ).first()
+    if duplicate:
+        return duplicate  # return ตัวเดิม ไม่ต้อง insert ใหม่
+
     notif = Notification(
         message=message,
-        timestamp=datetime.utcnow(),
+        timestamp=now,
         read=False,
         sender_name=sender_name,
         user_id=user_id,
