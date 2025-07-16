@@ -15,7 +15,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
 from sqlalchemy import desc
 
-LINE_ACCESS_TOKEN = "RF7HySsgh8pRmAW3UgwHu4fZ7WWyokBrrs1Ewx7tt8MJ47eFqlnZ4eOZnEg2UFZH++4ZW0gfRK/MLynU0kANOEq23M4Hqa6jdGGWeDO75TuPEEZJoHOw2yabnaSDOfhtXc9GzZdXW8qoVqFnROPhegdB04t89/1O/w1cDnyilFU="
+LINE_ACCESS_TOKEN = "O02yXH2dlIyu9da3bJPfhtHTZYkDJR/wy1TnWj5ZAgBUr0zfiNrY9mC3qm5nEWyILuI+rcVftmsvsQZp+AB8Hf6f5UmDosjtkQY0ufX+JrVwa3i+UwlAXa7UvBQ/JBef2pRD4wJ3QttJyLn1nfh1dQdB04t89/1O/w1cDnyilFU="
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
@@ -2144,7 +2144,7 @@ from datetime import datetime, timedelta
 def add_notification_to_db(message, sender_name, user_id=None, meta_data=None):
     now = datetime.utcnow()
     # ตรวจสอบซ้ำ (เช่น 10 วินาที)
-    duplicate = Notification.query.filter(
+    duplicate = db.session.query(Notification).filter(
         Notification.user_id == user_id,
         Notification.message == message,
         Notification.sender_name == sender_name,
