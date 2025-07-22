@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, abort
+from flask import Flask, jsonify, request
 import requests
 from flask_cors import CORS 
 import psycopg2
@@ -2202,6 +2202,7 @@ TICKET_SUBGROUPS = {
     ]
 }
 # ------------------- API: /api/types -------------------
+from flask import abort
 
 @app.route('/api/types', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def api_types():
