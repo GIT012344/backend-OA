@@ -2165,6 +2165,154 @@ def add_notification_to_db(message, sender_name, user_id=None, meta_data=None):
     db.session.commit()
     return notif
 
+# ------------------- In-memory data for types, groups, subgroups -------------------
+TICKET_TYPES = [
+    {"id": 1, "name": "Service"},
+    {"id": 2, "name": "Helpdesk"},
+    {"id": 3, "name": "Information"}
+]
+
+# ตัวอย่าง groups และ subgroups (สามารถแก้ไข/เพิ่มได้)
+TICKET_GROUPS = {
+    "Service": [
+        {"id": 1, "name": "Hardware"},
+        {"id": 2, "name": "Software"}
+    ],
+    "Helpdesk": [
+        {"id": 3, "name": "Network"},
+        {"id": 4, "name": "Account"}
+    ]
+}
+TICKET_SUBGROUPS = {
+    ("Service", "Hardware"): [
+        {"id": 1, "name": "PC"},
+        {"id": 2, "name": "Printer"}
+    ],
+    ("Service", "Software"): [
+        {"id": 3, "name": "Windows"},
+        {"id": 4, "name": "Office"}
+    ],
+    ("Helpdesk", "Network"): [
+        {"id": 5, "name": "WiFi"},
+        {"id": 6, "name": "LAN"}
+    ],
+    ("Helpdesk", "Account"): [
+        {"id": 7, "name": "Email"},
+        {"id": 8, "name": "AD"}
+    ]
+}
+# ------------------- API: /api/types -------------------
+from flask import abort
+
+@app.route('/api/types', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def api_types():
+    if request.method == 'GET':
+        return jsonify(TICKET_TYPES)
+    elif request.method == 'POST':
+        data = request.get_json()
+        if not data or 'name' not in data:
+            return jsonify({'error': 'name is required'}), 400
+        new_id = max([t['id'] for t in TICKET_TYPES], default=0) + 1
+        new_type = {"id": new_id, "name": data['name']}
+        TICKET_TYPES.append(new_type)
+        return jsonify(new_type), 201
+    elif request.method == 'PUT':
+        data = request.get_json()
+        if not data or 'id' not in data or 'name' not in data:
+            return jsonify({'error': 'id and name are required'}), 400
+        for t in TICKET_TYPES:
+            if t['id'] == data['id']:
+                t['name'] = data['name']
+                return jsonify(t)
+        return jsonify({'error': 'type not found'}), 404
+    elif request.method == 'DELETE':
+        data = request.get_json()
+        if not data or 'id' not in data:
+            return jsonify({'error': 'id is required'}), 400
+        for t in TICKET_TYPES:
+            if t['id'] == data['id']:
+                TICKET_TYPES.remove(t)
+                return jsonify({'success': True})
+        return jsonify({'error': 'type not found'}), 404
+
+# ------------------- API: /api/groups -------------------
+@app.route('/api/groups', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def api_groups():
+    type_name = request.args.get('type')
+    if not type_name:
+        return jsonify({'error': 'type parameter is required'}), 400
+    if request.method == 'GET':
+        return jsonify(TICKET_GROUPS.get(type_name, []))
+    elif request.method == 'POST':
+        data = request.get_json()
+        if not data or 'name' not in data:
+            return jsonify({'error': 'name is required'}), 400
+        group_list = TICKET_GROUPS.setdefault(type_name, [])
+        new_id = max([g['id'] for g in group_list], default=0) + 1
+        new_group = {"id": new_id, "name": data['name']}
+        group_list.append(new_group)
+        return jsonify(new_group), 201
+    elif request.method == 'PUT':
+        data = request.get_json()
+        if not data or 'id' not in data or 'name' not in data:
+            return jsonify({'error': 'id and name are required'}), 400
+        group_list = TICKET_GROUPS.get(type_name, [])
+        for g in group_list:
+            if g['id'] == data['id']:
+                g['name'] = data['name']
+                return jsonify(g)
+        return jsonify({'error': 'group not found'}), 404
+    elif request.method == 'DELETE':
+        data = request.get_json()
+        if not data or 'id' not in data:
+            return jsonify({'error': 'id is required'}), 400
+        group_list = TICKET_GROUPS.get(type_name, [])
+        for g in group_list:
+            if g['id'] == data['id']:
+                group_list.remove(g)
+                return jsonify({'success': True})
+        return jsonify({'error': 'group not found'}), 404
+
+# ------------------- API: /api/subgroups -------------------
+@app.route('/api/subgroups', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def api_subgroups():
+    type_name = request.args.get('type')
+    group_name = request.args.get('group')
+    if not type_name or not group_name:
+        return jsonify({'error': 'type and group parameters are required'}), 400
+    key = (type_name, group_name)
+    if request.method == 'GET':
+        return jsonify(TICKET_SUBGROUPS.get(key, []))
+    elif request.method == 'POST':
+        data = request.get_json()
+        if not data or 'name' not in data:
+            return jsonify({'error': 'name is required'}), 400
+        sub_list = TICKET_SUBGROUPS.setdefault(key, [])
+        new_id = max([s['id'] for s in sub_list], default=0) + 1
+        new_sub = {"id": new_id, "name": data['name']}
+        sub_list.append(new_sub)
+        return jsonify(new_sub), 201
+    elif request.method == 'PUT':
+        data = request.get_json()
+        if not data or 'id' not in data or 'name' not in data:
+            return jsonify({'error': 'id and name are required'}), 400
+        sub_list = TICKET_SUBGROUPS.get(key, [])
+        for s in sub_list:
+            if s['id'] == data['id']:
+                s['name'] = data['name']
+                return jsonify(s)
+        return jsonify({'error': 'subgroup not found'}), 404
+    elif request.method == 'DELETE':
+        data = request.get_json()
+        if not data or 'id' not in data:
+            return jsonify({'error': 'id is required'}), 400
+        sub_list = TICKET_SUBGROUPS.get(key, [])
+        for s in sub_list:
+            if s['id'] == data['id']:
+                sub_list.remove(s)
+                return jsonify({'success': True})
+        return jsonify({'error': 'subgroup not found'}), 404
+
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
