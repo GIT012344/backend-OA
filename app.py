@@ -30,10 +30,10 @@ jwt = JWTManager(app)
 # แก้ไข CORS ให้รองรับทุก origin
 CORS(app, origins=["*"], supports_credentials=True)
 
-DB_NAME = 'datagit'
-DB_USER = 'git'
-DB_PASSWORD = '4H9c9zbnSxqdrQVUY2ErAtJwzJINcfNn'
-DB_HOST = 'dpg-d19qj8bipnbc739c4aq0-a.singapore-postgres.render.com'
+DB_NAME = 'neondb'
+DB_USER = 'neondb_owner'
+DB_PASSWORD = 'npg_EWHCa2rPg7wK'
+DB_HOST = 'ep-dark-math-a1oavnp6-pooler.ap-southeast-1.aws.neon.tech'
 DB_PORT = 5432
 
 # Flask-SQLAlchemy configuration
