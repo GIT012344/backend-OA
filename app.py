@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 import requests
 from flask_cors import CORS 
 import psycopg2
+import uuid
 from datetime import datetime, timezone, timedelta
 import os
 from datetime import timedelta
@@ -59,6 +60,8 @@ class Ticket(db.Model):
     type = db.Column(db.String)
     textbox = db.Column(db.String)
     subgroup = db.Column(db.String)
+    # Relationship to cascade delete messages when a ticket is removed
+    messages = db.relationship('Message', backref='ticket', cascade='all, delete, delete-orphan', passive_deletes=True)
 class Notification(db.Model):
     __tablename__ = 'notifications'
     
@@ -98,6 +101,7 @@ class Notification(db.Model):
 class Message(db.Model):
     __tablename__ = 'messages'
     id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.String, db.ForeignKey('tickets.ticket_id', ondelete='CASCADE'), nullable=False)
     user_id = db.Column(db.String, nullable=False)
     admin_id = db.Column(db.String, nullable=True)
     sender_type = db.Column(db.String, nullable=False)  # 'user' or 'admin', ป้องกัน null
@@ -681,6 +685,73 @@ def get_data():
             "message": str(e)
         }), 500
 
+# ---------- Ticket create & update endpoints ----------
+
+@app.route('/create-ticket', methods=['POST'])
+def create_ticket():
+    """Create a new ticket. Accepts JSON payload and stores requested/report fields for ALL types."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+
+    ticket_id = data.get('ticket_id') or str(uuid.uuid4())
+    if Ticket.query.get(ticket_id):
+        return jsonify({"error": "Ticket ID already exists"}), 400
+
+    try:
+        new_ticket = Ticket()
+        new_ticket.ticket_id  = ticket_id
+        new_ticket.email      = data.get('email')
+        new_ticket.name       = data.get('name')
+        new_ticket.phone      = data.get('phone')
+        new_ticket.department = data.get('department')
+        new_ticket.created_at = datetime.utcnow()
+        new_ticket.status     = data.get('status', 'OPEN')
+        new_ticket.appointment= data.get('appointment')
+        new_ticket.type       = data.get('type')
+        new_ticket.subgroup   = data.get('subgroup')
+        
+        new_ticket.requested  = data.get('request', data.get('requested'))
+        new_ticket.report     = data.get('report')
+        # ----------------------------
+        db.session.add(new_ticket)
+        db.session.commit()
+        return jsonify({"success": True, "ticket_id": ticket_id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+def update_ticket():
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+
+    ticket_id = data.get('ticket_id')
+    if not ticket_id:
+        return jsonify({"error": "ticket_id required"}), 400
+
+    try:
+        ticket = Ticket.query.get(ticket_id)
+        if not ticket:
+            return jsonify({"error": "Ticket not found"}), 404
+
+        # update general fields
+        ticket.type       = data.get('type', ticket.type)
+        ticket.subgroup   = data.get('subgroup', ticket.subgroup)
+        ticket.appointment= data.get('appointment', ticket.appointment)
+        ticket.status     = data.get('status', ticket.status)
+        
+        ticket.requested  = data.get('request', data.get('requested', ticket.requested))
+        ticket.report     = data.get('report', ticket.report)
+        # ----------------------------
+        db.session.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 # ---------- New endpoint for dashboard appointments ----------
 @app.route('/api/appointments')
 @cache.cached(timeout=60)
@@ -728,7 +799,26 @@ def update_status():
             
         current_status = ticket.status
 
-        # Only proceed if status is actually changing
+        # ---- Enhanced field updates ----
+        original_type = ticket.type
+        original_requested = ticket.requested
+        original_report = ticket.report
+        original_subgroup = ticket.subgroup
+
+        # Apply updates from payload (group/request/report/type)
+        ticket.type = data.get('type', ticket.type)
+        ticket.subgroup = data.get('subgroup', ticket.subgroup)
+        ticket.requested = data.get('request', data.get('requested', ticket.requested))
+        ticket.report = data.get('report', ticket.report)
+
+        fields_changed = (
+            current_status != new_status or
+            original_type != ticket.type or
+            original_requested != ticket.requested or
+            original_report != ticket.report or
+            original_subgroup != ticket.subgroup
+        )
+        # ---------------------------------
         if current_status != new_status:
             ticket.status = new_status
             ticket.subgroup = data.get('subgroup', ticket.subgroup)
@@ -821,50 +911,40 @@ def update_status():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-@app.route('/delete-ticket', methods=['POST'])
+@app.route("/delete-ticket", methods=["POST"])
 def delete_ticket():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-        
-    ticket_id = data.get('ticket_id')
+    data       = request.get_json()
+    ticket_id  = data.get("ticket_id")
 
     if not ticket_id:
-        return jsonify({"error": "Ticket ID is required"}), 400
+        return jsonify({"error": "ticket_id required"}), 400
 
     try:
-        # 1. ลบข้อความที่เกี่ยวข้อง
-        Message.query.filter_by(user_id=ticket_id).delete()
-        
-        # 2. ลบ ticket จาก PostgreSQL
-        ticket = Ticket.query.get(ticket_id)
-        if not ticket:
-            return jsonify({"error": "Ticket not found in database"}), 404
-        
-        db.session.delete(ticket)
-        
-        # 3. สร้าง notification
-        add_notification_to_db(
-            message=f"Ticket {ticket_id} has been deleted",
-            sender_name="system",
-            user_id=ticket_id,
-            meta_data={"type": "ticket_deleted", "ticket_id": ticket_id}
-        )
-        
-        db.session.commit()
+        # 1) ลบ TicketStatusLog และ Message ที่อ้างถึง ticket_id นี้ก่อน แล้ว commit แยก
+        try:
+            TicketStatusLog.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
+            Message.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
+            db.session.commit()  # commit ทันทีเพื่อให้ DB ลบ record เหล่านั้นจริง ๆ
+        except Exception as msg_err:
+            db.session.rollback()
+            return jsonify({"error": f"Failed to delete related messages: {msg_err}"}), 500
 
-        return jsonify({
-            "success": True, 
-            "message": "Ticket deleted from PostgreSQL"
-        })
+        # 2) ลบ ticket หลังจากข้อความถูกลบไปแล้ว จึงไม่ติด FK
+        try:
+            ticket = Ticket.query.get(ticket_id)
+            if not ticket:
+                return jsonify({"error": "Ticket not found"}), 404
+
+            db.session.delete(ticket)
+            db.session.commit()
+            return jsonify({"success": True}), 200
+        except Exception as tk_err:
+            db.session.rollback()
+            return jsonify({"error": f"Failed to delete ticket: {tk_err}"}), 500
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error deleting ticket: {str(e)}")
-        return jsonify({
-            "error": "Failed to delete ticket",
-            "details": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/auto-clear-textbox', methods=['POST'])
 def auto_clear_textbox():
