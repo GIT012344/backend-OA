@@ -3,6 +3,7 @@ import requests
 from flask_cors import CORS 
 import psycopg2
 import uuid
+import json
 from datetime import datetime, timezone, timedelta
 import os
 from datetime import timedelta
@@ -684,6 +685,39 @@ def get_data():
             "error": "Internal server error",
             "message": str(e)
         }), 500
+
+# ---------- Type-Group-Subgroup endpoints ----------
+TYPE_GROUP_FILE = 'type_group.json'
+
+def _load_tgs() -> dict:
+    if os.path.exists(TYPE_GROUP_FILE):
+        try:
+            with open(TYPE_GROUP_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def _save_tgs(data: dict) -> None:
+    with open(TYPE_GROUP_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+@app.route('/type-group-subgroup', methods=['GET', 'OPTIONS'])
+def get_type_group_subgroup():
+    """Return mapping of Type->Group->Subgroup. Returns {{}} if none."""
+    return jsonify(_load_tgs())
+
+@app.route('/type-group-subgroup', methods=['POST', 'OPTIONS'])
+def save_type_group_subgroup():
+    """Save full mapping JSON sent from frontend."""
+    data = request.get_json()
+    if not isinstance(data, dict):
+        return jsonify({'error': 'invalid format'}), 400
+    try:
+        _save_tgs(data)
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ---------- Ticket create & update endpoints ----------
 
