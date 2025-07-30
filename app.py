@@ -29,6 +29,27 @@ app.config['JWT_HEADER_NAME'] = 'Authorization'
 app.config['JWT_HEADER_TYPE'] = 'Bearer'
 jwt = JWTManager(app)
 
+# JWT Error Handlers
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    return jsonify({'error': 'Token has expired'}), 401
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    return jsonify({'error': 'Invalid token'}), 422
+
+@jwt.unauthorized_loader
+def missing_token_callback(error):
+    return jsonify({'error': 'Authorization token is required'}), 401
+
+@jwt.needs_fresh_token_loader
+def token_not_fresh_callback(jwt_header, jwt_payload):
+    return jsonify({'error': 'Fresh token required'}), 401
+
+@jwt.revoked_token_loader
+def revoked_token_callback(jwt_header, jwt_payload):
+    return jsonify({'error': 'Token has been revoked'}), 401
+
 # แก้ไข CORS ให้รองรับทุก origin
 CORS(app, origins=["*"], supports_credentials=True)
 
@@ -166,13 +187,239 @@ class User(db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=True)  # Username for login
+    password_hash = db.Column(db.String(255), nullable=True)  # Hashed password
+    email = db.Column(db.String(100), unique=True, nullable=True)  # Email address
     pin = db.Column(db.String(10), unique=True, nullable=False)  # รหัส PIN
     role = db.Column(db.String(20), default='user')  # 'user' หรือ 'admin'
     name = db.Column(db.String(100), nullable=False)  # ชื่อผู้ใช้
     is_active = db.Column(db.Boolean, default=True)  # สถานะการใช้งาน
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True)
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    account_locked_until = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    sessions = db.relationship('UserSession', backref='user', cascade='all, delete-orphan')
+    activity_logs = db.relationship('UserActivityLog', backref='user', cascade='all, delete-orphan')
 
     def check_pin(self, pin):
         return self.pin == pin and self.is_active
+    
+    def check_password(self, password):
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+    
+    def is_account_locked(self):
+        if not self.account_locked_until:
+            return False
+        try:
+            current_time = datetime.utcnow()
+            locked_until = self.account_locked_until
+            
+            # Handle timezone-aware vs timezone-naive datetime comparison
+            if locked_until.tzinfo is not None and current_time.tzinfo is None:
+                current_time = current_time.replace(tzinfo=locked_until.tzinfo)
+            elif locked_until.tzinfo is None and current_time.tzinfo is not None:
+                locked_until = locked_until.replace(tzinfo=current_time.tzinfo)
+            
+            return current_time < locked_until
+        except Exception as e:
+            print(f"Error in is_account_locked: {str(e)}")
+            return False
+    
+    def lock_account(self, duration_minutes=30):
+        self.account_locked_until = datetime.utcnow() + timedelta(minutes=duration_minutes)
+        db.session.commit()
+    
+    def unlock_account(self):
+        self.account_locked_until = None
+        self.failed_login_attempts = 0
+        db.session.commit()
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'email': self.email,
+            'name': self.name,
+            'role': self.role,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'is_locked': self.is_account_locked()
+        }
+
+class UserSession(db.Model):
+    __tablename__ = 'user_sessions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    session_token = db.Column(db.String(255), unique=True, nullable=False)
+    pin_verified = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    last_activity = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(45))  # IPv6 compatible
+    user_agent = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    def is_expired(self):
+        try:
+            current_time = datetime.utcnow()
+            expires_time = self.expires_at
+            
+            # Handle timezone-aware vs timezone-naive datetime comparison
+            if expires_time.tzinfo is not None and current_time.tzinfo is None:
+                # expires_at is timezone-aware, current_time is naive
+                current_time = current_time.replace(tzinfo=expires_time.tzinfo)
+            elif expires_time.tzinfo is None and current_time.tzinfo is not None:
+                # expires_at is naive, current_time is timezone-aware
+                expires_time = expires_time.replace(tzinfo=current_time.tzinfo)
+            
+            return current_time > expires_time
+        except Exception as e:
+            print(f"Error in is_expired: {str(e)}")
+            # If there's an error, assume not expired for safety
+            return False
+    
+    def extend_session(self, hours=24):
+        self.expires_at = datetime.utcnow() + timedelta(hours=hours)
+        self.last_activity = datetime.utcnow()
+        db.session.commit()
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'pin_verified': self.pin_verified,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'last_activity': self.last_activity.isoformat() if self.last_activity else None,
+            'is_active': self.is_active,
+            'is_expired': self.is_expired()
+        }
+
+class UserActivityLog(db.Model):
+    __tablename__ = 'user_activity_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    session_id = db.Column(db.Integer, db.ForeignKey('user_sessions.id'), nullable=True)
+    action_type = db.Column(db.String(50), nullable=False)  # login, logout, pin_verify, create_ticket, etc.
+    resource_type = db.Column(db.String(50), nullable=True)  # ticket, message, user, etc.
+    resource_id = db.Column(db.String(100), nullable=True)  # ID of resource
+    action_details = db.Column(db.JSON, nullable=True)  # Additional details
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    success = db.Column(db.Boolean, default=True)
+    error_message = db.Column(db.Text)
+    
+    def get_thai_time(self):
+        if self.created_at:
+            return self.created_at.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=7)))
+        return None
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'session_id': self.session_id,
+            'action_type': self.action_type,
+            'resource_type': self.resource_type,
+            'resource_id': self.resource_id,
+            'action_details': self.action_details,
+            'created_at': self.get_thai_time().isoformat() if self.created_at else None,
+            'success': self.success,
+            'error_message': self.error_message
+        }
+
+# Helper functions for activity logging and session management
+def log_user_activity(user_id=None, session_id=None, action_type=None, resource_type=None, 
+                     resource_id=None, action_details=None, success=True, error_message=None, 
+                     ip_address=None, user_agent=None):
+    """Log user activity for audit trail"""
+    try:
+        activity_log = UserActivityLog(
+            user_id=user_id,
+            session_id=session_id,
+            action_type=action_type,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            action_details=action_details,
+            success=success,
+            error_message=error_message,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        db.session.add(activity_log)
+        db.session.commit()
+        return activity_log
+    except Exception as e:
+        print(f"Error logging activity: {str(e)}")
+        db.session.rollback()
+        return None
+
+def get_user_from_token():
+    """Get user from JWT token with new structure"""
+    try:
+        # get_jwt_identity() now returns user_id as string
+        user_id = get_jwt_identity()
+        if user_id:
+            # Convert to int and get user
+            user = User.query.get(int(user_id))
+            return user
+    except Exception as e:
+        print(f"Error getting user from token: {str(e)}")
+        pass
+    return None
+
+def get_session_from_token():
+    """Get active session from JWT token with new structure"""
+    try:
+        from flask_jwt_extended import get_jwt
+        
+        # Get additional claims from JWT
+        claims = get_jwt()
+        session_token = claims.get('session_token')
+        
+        if session_token:
+            session = UserSession.query.filter_by(
+                session_token=session_token,
+                is_active=True
+            ).first()
+            if session and not session.is_expired():
+                return session
+    except Exception as e:
+        print(f"Error getting session from token: {str(e)}")
+        pass
+    return None
+
+def require_pin_verification():
+    """Decorator to require PIN verification after login"""
+    def decorator(f):
+        def wrapper(*args, **kwargs):
+            session = get_session_from_token()
+            if not session or not session.pin_verified:
+                return jsonify({'error': 'PIN verification required'}), 403
+            return f(*args, **kwargs)
+        wrapper.__name__ = f.__name__
+        return wrapper
+    return decorator
+
+def get_client_info(request):
+    """Extract client IP and User-Agent from request"""
+    ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+    if ip_address and ',' in ip_address:
+        ip_address = ip_address.split(',')[0].strip()
+    user_agent = request.headers.get('User-Agent', '')
+    return ip_address, user_agent
 
 def send_textbox_message(user_id, message_text):
     url = "https://api.line.me/v2/bot/message/push"
@@ -455,6 +702,96 @@ def mark_all_notifications_read():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# ================= AUTHENTICATION APIs =================
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    """Register new user with username, password, email, and PIN"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Missing JSON data'}), 400
+        
+        # Validate required fields
+        required_fields = ['username', 'password', 'email', 'pin', 'name']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        username = data['username'].strip()
+        password = data['password']
+        email = data['email'].strip().lower()
+        pin = data['pin'].strip()
+        name = data['name'].strip()
+        role = data.get('role', 'user')  # Default to 'user' role
+        
+        # Validate input lengths and formats
+        if len(username) < 3 or len(username) > 50:
+            return jsonify({'error': 'Username must be between 3-50 characters'}), 400
+        
+        if len(password) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        
+        if len(pin) < 4 or len(pin) > 10:
+            return jsonify({'error': 'PIN must be between 4-10 characters'}), 400
+        
+        if '@' not in email or len(email) > 100:
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        # Check if username, email, or PIN already exists
+        existing_user = User.query.filter(
+            (User.username == username) | 
+            (User.email == email) | 
+            (User.pin == pin)
+        ).first()
+        
+        if existing_user:
+            if existing_user.username == username:
+                return jsonify({'error': 'Username already exists'}), 409
+            elif existing_user.email == email:
+                return jsonify({'error': 'Email already exists'}), 409
+            elif existing_user.pin == pin:
+                return jsonify({'error': 'PIN already exists'}), 409
+        
+        # Create new user
+        new_user = User(
+            username=username,
+            email=email,
+            pin=pin,
+            name=name,
+            role=role,
+            is_active=True
+        )
+        new_user.set_password(password)
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        # Log registration activity
+        ip_address, user_agent = get_client_info(request)
+        log_user_activity(
+            user_id=new_user.id,
+            action_type='register',
+            action_details={
+                'username': username,
+                'email': email,
+                'role': role
+            },
+            success=True,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        
+        return jsonify({
+            'message': 'User registered successfully',
+            'user': new_user.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Registration error: {str(e)}")
+        return jsonify({'error': 'Registration failed', 'details': str(e)}), 500
+
 def create_tickets_table():
     # Create all tables using SQLAlchemy
     db.create_all()
@@ -486,124 +823,400 @@ def create_tables():
         db.session.add(user)
         db.session.commit()
 
-# เพิ่ม route สำหรับ login
 @app.route('/api/login', methods=['POST'])
 def login():
+    """Login with username/password only - all users must have accounts"""
     try:
-        print("=" * 50)
-        print("LOGIN REQUEST RECEIVED")
-        print("=" * 50)
-        print(f"Method: {request.method}")
-        print(f"URL: {request.url}")
-        print(f"Content-Type: {request.content_type}")
-        print(f"Content-Length: {request.content_length}")
-        print(f"Headers: {dict(request.headers)}")
-        
-        # ตรวจสอบ Content-Type
-        if request.content_type and 'application/json' not in request.content_type:
-            print(f"ERROR: Invalid content type: {request.content_type}")
-            return jsonify({"msg": "Content-Type must be application/json"}), 400
-
-        # ตรวจสอบว่าเป็น JSON หรือไม่
-        if not request.is_json:
-            print("ERROR: Request is not JSON")
-            # ลองอ่าน raw data
-            raw_data = request.get_data(as_text=True)
-            print(f"Raw data: {raw_data}")
-            return jsonify({"msg": "Missing JSON in request"}), 400
-
         data = request.get_json()
-        print(f"SUCCESS: Received JSON data: {data}")
-        print(f"Data type: {type(data)}")
-        
         if not data:
-            print("ERROR: No data received")
-            return jsonify({"msg": "Missing JSON data"}), 400
-
-        # รองรับหลายรูปแบบของ PIN
-        pin = None
-        print(f"Checking for pin in data keys: {list(data.keys())}")
+            return jsonify({'error': 'Missing JSON data'}), 400
         
-        if 'pin' in data:
-            pin = data['pin']
-            print(f"Found 'pin' field: {pin}")
-        elif 'username' in data:
-            pin = data['username']
-            print(f"Found 'username' field: {pin}")
-        elif 'password' in data:
-            pin = data['password']
-            print(f"Found 'password' field: {pin}")
-        elif 'email' in data:
-            pin = data['email']
-            print(f"Found 'email' field: {pin}")
-        else:
-            print(f"ERROR: No valid field found. Available fields: {list(data.keys())}")
-            return jsonify({"msg": "Missing PIN/username/password/email field"}), 400
-
-        if not pin:
-            print("ERROR: PIN is empty or None")
-            return jsonify({"msg": "Missing PIN/username/password"}), 400
-
-        # แปลง PIN เป็น string
-        pin = str(pin).strip()
-        print(f"LOGIN: Login attempt with PIN: '{pin}' (length: {len(pin)})")
-
-        # ตรวจสอบว่ามีตาราง users หรือไม่
-        try:
-            user = User.query.filter_by(pin=pin).first()
-            print(f"USER: User found: {user}")
-            if user:
-                print(f"   - ID: {user.id}")
-                print(f"   - Name: {user.name}")
-                print(f"   - Role: {user.role}")
-                print(f"   - Active: {user.is_active}")
-        except Exception as db_error:
-            print(f"ERROR: Database error: {db_error}")
-            return jsonify({"msg": "Database connection error"}), 500
-
+        ip_address, user_agent = get_client_info(request)
+        
+        # Require username and password for all users
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({'error': 'Username and password are required'}), 400
+        
+        user = User.query.filter_by(username=username).first()
+        
         if not user:
-            print(f"ERROR: No user found with PIN: {pin}")
-            return jsonify({"msg": "Invalid PIN - User not found"}), 401
+            # Log failed login attempt
+            log_user_activity(
+                action_type='login_failed',
+                action_details={'username': username, 'reason': 'user_not_found'},
+                success=False,
+                error_message='User not found',
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            return jsonify({'error': 'Invalid username or password'}), 401
         
-        if not user.check_pin(pin):
-            print(f"ERROR: PIN check failed for user: {user.name}")
-            return jsonify({"msg": "Invalid PIN - User inactive or PIN mismatch"}), 401
-
-        access_token = create_access_token(identity={
-            'pin': user.pin,
-            'role': user.role,
-            'name': user.name
-        })
+        # Check if account is locked
+        if user.is_account_locked():
+            log_user_activity(
+                user_id=user.id,
+                action_type='login_failed',
+                action_details={'username': username, 'reason': 'account_locked'},
+                success=False,
+                error_message='Account locked',
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            return jsonify({'error': 'Account is locked. Please try again later.'}), 423
         
-        print(f"SUCCESS: Login successful for user: {user.name} (PIN: {user.pin})")
-        print("=" * 50)
+        # Verify password
+        if not user.check_password(password):
+            # Increment failed login attempts
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= 5:
+                user.lock_account(30)  # Lock for 30 minutes
+                db.session.commit()
+                
+                log_user_activity(
+                    user_id=user.id,
+                    action_type='account_locked',
+                    action_details={'username': username, 'failed_attempts': user.failed_login_attempts},
+                    success=False,
+                    error_message='Too many failed attempts',
+                    ip_address=ip_address,
+                    user_agent=user_agent
+                )
+                return jsonify({'error': 'Account locked due to too many failed attempts'}), 423
+            else:
+                db.session.commit()
+                log_user_activity(
+                    user_id=user.id,
+                    action_type='login_failed',
+                    action_details={'username': username, 'reason': 'wrong_password', 'attempts': user.failed_login_attempts},
+                    success=False,
+                    error_message='Wrong password',
+                    ip_address=ip_address,
+                    user_agent=user_agent
+                )
+                return jsonify({'error': 'Invalid username or password'}), 401
+        
+        # Check if user is active
+        if not user.is_active:
+            log_user_activity(
+                user_id=user.id,
+                action_type='login_failed',
+                action_details={'reason': 'account_inactive'},
+                success=False,
+                error_message='Account inactive',
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            return jsonify({'error': 'Account is inactive'}), 403
+        
+        # Reset failed login attempts on successful login
+        if user.failed_login_attempts > 0:
+            user.failed_login_attempts = 0
+            user.account_locked_until = None
+        
+        # Update last login time
+        user.last_login = datetime.utcnow()
+        
+        # Create session
+        session_token = str(uuid.uuid4())
+        expires_at = datetime.utcnow() + timedelta(hours=24)
+        
+        user_session = UserSession(
+            user_id=user.id,
+            session_token=session_token,
+            pin_verified=False,  # Will be set to True after PIN verification
+            expires_at=expires_at,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        
+        db.session.add(user_session)
+        db.session.commit()
+        
+        # Create JWT token with standard structure
+        # Use user_id as subject (string) and other data as additional claims
+        access_token = create_access_token(
+            identity=str(user.id),  # Standard JWT subject as string
+            additional_claims={
+                'pin': user.pin,
+                'role': user.role,
+                'name': user.name,
+                'session_token': session_token,
+                'login_method': 'username_password',
+                'user_id': user.id  # Keep for backward compatibility
+            }
+        )
+        
+        # Log successful login
+        log_user_activity(
+            user_id=user.id,
+            session_id=user_session.id,
+            action_type='login_success',
+            action_details={
+                'login_method': 'username_password',
+                'username': username
+            },
+            success=True,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
         
         return jsonify({
-            "access_token": access_token,
-            "user": {
-                "name": user.name,
-                "role": user.role
+            'access_token': access_token,
+            'user': user.to_dict(),
+            'session': user_session.to_dict(),
+            'requires_pin': True,  # Always require PIN after login
+            'message': 'Login successful. Please enter your PIN (000000) to continue.'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Login error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Login failed', 'details': str(e)}), 500
+
+@app.route('/api/verify-pin', methods=['POST'])
+@jwt_required()
+def verify_pin():
+    """Verify PIN after login to enable full access - expects only {"pin": "000000"}"""
+    try:
+        data = request.get_json()
+        if not data or 'pin' not in data:
+            return jsonify({'error': 'PIN is required'}), 400
+        
+        pin = str(data['pin']).strip()
+        
+        # Get user from new JWT structure
+        user = get_user_from_token()
+        if not user:
+            return jsonify({'error': 'Invalid session or user not found'}), 401
+        
+        # Verify PIN
+        if not user.check_pin(pin):
+            ip_address, user_agent = get_client_info(request)
+            log_user_activity(
+                user_id=user.id,
+                action_type='pin_verification_failed',
+                action_details={'pin_attempt': pin},
+                success=False,
+                error_message='Invalid PIN',
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            return jsonify({'error': 'Invalid PIN'}), 401
+        
+        # Update session to mark PIN as verified
+        session = get_session_from_token()
+        if not session or session.user_id != user.id:
+            return jsonify({'error': 'Session not found or invalid'}), 404
+        
+        # Update session PIN verification status
+        session.pin_verified = True
+        session.last_activity = datetime.utcnow()
+        db.session.commit()
+        
+        # Log successful PIN verification
+        ip_address, user_agent = get_client_info(request)
+        from flask_jwt_extended import get_jwt
+        claims = get_jwt()
+        
+        log_user_activity(
+            user_id=user.id,
+            session_id=session.id,
+            action_type='pin_verification_success',
+            action_details={'login_method': claims.get('login_method', 'unknown')},
+            success=True,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        
+        return jsonify({
+            'message': 'PIN verified successfully',
+            'user': user.to_dict(),
+            'session': session.to_dict()
+        }), 200
+            
+    except Exception as e:
+        db.session.rollback()
+        print(f"PIN verification error: {str(e)}")
+        return jsonify({'error': 'PIN verification failed', 'details': str(e)}), 500
+
+@app.route('/api/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """Enhanced logout with session management"""
+    try:
+        # Get user and session from new JWT structure
+        user = get_user_from_token()
+        session = get_session_from_token()
+        
+        if user and session:
+            # Deactivate session
+            if session.user_id == user.id:
+                session.is_active = False
+                db.session.commit()
+                
+                # Log logout activity
+                ip_address, user_agent = get_client_info(request)
+                log_user_activity(
+                    user_id=user.id,
+                    session_id=session.id,
+                    action_type='logout',
+                    action_details={'session_duration': str(datetime.utcnow() - session.created_at)},
+                    success=True,
+                    ip_address=ip_address,
+                    user_agent=user_agent
+                )
+        
+        return jsonify({'message': 'Logout successful'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Logout error: {str(e)}")
+        return jsonify({'error': 'Logout failed', 'details': str(e)}), 500
+
+# ================= USER ACTIVITY & MANAGEMENT APIs =================
+
+@app.route('/api/user/activity-logs', methods=['GET'])
+@jwt_required()
+def get_user_activity_logs():
+    """Get activity logs for current user or all users (admin only)"""
+    try:
+        current_user_data = get_jwt_identity()
+        current_user = User.query.get(current_user_data['user_id'])
+        
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Check PIN verification
+        session = get_session_from_token()
+        if not session or not session.pin_verified:
+            return jsonify({'error': 'PIN verification required'}), 403
+        
+        # Get query parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        user_id = request.args.get('user_id', type=int)
+        action_type = request.args.get('action_type')
+        
+        # Build query
+        query = UserActivityLog.query
+        
+        # If not admin, only show own logs
+        if current_user.role != 'admin':
+            query = query.filter_by(user_id=current_user.id)
+        elif user_id:  # Admin can filter by specific user
+            query = query.filter_by(user_id=user_id)
+        
+        # Filter by action type if specified
+        if action_type:
+            query = query.filter_by(action_type=action_type)
+        
+        # Order by most recent first
+        query = query.order_by(UserActivityLog.created_at.desc())
+        
+        # Paginate
+        logs = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return jsonify({
+            'logs': [log.to_dict() for log in logs.items],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': logs.total,
+                'pages': logs.pages,
+                'has_next': logs.has_next,
+                'has_prev': logs.has_prev
             }
         }), 200
         
     except Exception as e:
-        print(f"ERROR: Login error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"msg": "Internal server error", "error": str(e)}), 500
+        print(f"Activity logs error: {str(e)}")
+        return jsonify({'error': 'Failed to fetch activity logs', 'details': str(e)}), 500
 
-# เพิ่ม route สำหรับ logout
-@app.route('/api/logout', methods=['POST'])
-def logout():
+@app.route('/api/admin/users', methods=['GET'])
+@jwt_required()
+def get_all_users():
+    """Get all users (admin only)"""
     try:
-        # ในระบบ JWT ไม่จำเป็นต้องทำอะไรกับ token เพราะ client จะลบ token เอง
-        # แต่เราสามารถเพิ่ม token ลงใน blacklist ได้ถ้าต้องการ
-        return jsonify({"msg": "Logout successful"}), 200
+        current_user_data = get_jwt_identity()
+        current_user = User.query.get(current_user_data['user_id'])
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        # Check PIN verification
+        session = get_session_from_token()
+        if not session or not session.pin_verified:
+            return jsonify({'error': 'PIN verification required'}), 403
+        
+        users = User.query.all()
+        return jsonify({
+            'users': [user.to_dict() for user in users]
+        }), 200
+        
     except Exception as e:
-        print(f"Logout error: {str(e)}")
-        return jsonify({"msg": "Logout error"}), 500
+        print(f"Get users error: {str(e)}")
+        return jsonify({'error': 'Failed to fetch users', 'details': str(e)}), 500
 
-# เพิ่ม route สำหรับตรวจสอบ token
+@app.route('/api/admin/users/<int:user_id>/toggle-status', methods=['POST'])
+@jwt_required()
+def toggle_user_status(user_id):
+    """Toggle user active status (admin only)"""
+    try:
+        current_user_data = get_jwt_identity()
+        current_user = User.query.get(current_user_data['user_id'])
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        # Check PIN verification
+        session = get_session_from_token()
+        if not session or not session.pin_verified:
+            return jsonify({'error': 'PIN verification required'}), 403
+        
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Don't allow deactivating self
+        if target_user.id == current_user.id:
+            return jsonify({'error': 'Cannot deactivate your own account'}), 400
+        
+        # Toggle status
+        target_user.is_active = not target_user.is_active
+        db.session.commit()
+        
+        # Log the action
+        ip_address, user_agent = get_client_info(request)
+        log_user_activity(
+            user_id=current_user.id,
+            session_id=session.id,
+            action_type='user_status_changed',
+            resource_type='user',
+            resource_id=str(target_user.id),
+            action_details={
+                'target_user': target_user.username,
+                'new_status': 'active' if target_user.is_active else 'inactive'
+            },
+            success=True,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        
+        return jsonify({
+            'message': f'User {target_user.username} has been {"activated" if target_user.is_active else "deactivated"}',
+            'user': target_user.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Toggle user status error: {str(e)}")
+        return jsonify({'error': 'Failed to toggle user status', 'details': str(e)}), 500
+
 @app.route('/api/protected', methods=['GET'])
 @jwt_required()
 def protected():
@@ -659,9 +1272,9 @@ def get_data():
                 "ชื่อ": ticket.name,
                 "เบอร์ติดต่อ": ticket.phone,
                 "แผนก": ticket.department,
-                "วันที่แจ้ง": ticket.created_at.isoformat() if ticket.created_at else "",
+                "วันที่แจ้ง": ticket.created_at.strftime('%Y-%m-%d %H:%M') if ticket.created_at else "",
                 "สถานะ": ticket.status,
-                "Appointment": ticket.appointment,
+                "Appointment": validate_appointment_field(ticket.appointment, ticket.created_at),
                 "Requested": ticket.requested,
                 "Report": ticket.report,
                 "Type": ticket.type,
@@ -722,19 +1335,34 @@ def save_type_group_subgroup():
 # ---------- Ticket create & update endpoints ----------
 
 @app.route('/create-ticket', methods=['POST'])
+@jwt_required()
 def create_ticket():
-    """Create a new ticket. Accepts JSON payload and stores requested/report fields for ALL types."""
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-
-    ticket_id = data.get('ticket_id') or str(uuid.uuid4())
-    if Ticket.query.get(ticket_id):
-        return jsonify({"error": "Ticket ID already exists"}), 400
-
+    """Create a new ticket with user activity logging"""
     try:
+        # Get current user and session
+        current_user_data = get_jwt_identity()
+        current_user = User.query.get(current_user_data['user_id'])
+        
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Check PIN verification
+        session = get_session_from_token()
+        if not session or not session.pin_verified:
+            return jsonify({'error': 'PIN verification required'}), 403
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+
+        ticket_id = data.get('ticket_id') or str(uuid.uuid4())
+        if Ticket.query.get(ticket_id):
+            return jsonify({"error": "Ticket ID already exists"}), 400
+
+        # Create new ticket
         new_ticket = Ticket()
         new_ticket.ticket_id  = ticket_id
+        new_ticket.user_id    = str(current_user.id)  # Link ticket to user
         new_ticket.email      = data.get('email')
         new_ticket.name       = data.get('name')
         new_ticket.phone      = data.get('phone')
@@ -744,15 +1372,56 @@ def create_ticket():
         new_ticket.appointment= data.get('appointment')
         new_ticket.type       = data.get('type')
         new_ticket.subgroup   = data.get('subgroup')
-        
         new_ticket.requested  = data.get('request', data.get('requested'))
         new_ticket.report     = data.get('report')
-        # ----------------------------
+        new_ticket.textbox    = data.get('textbox')
+        
         db.session.add(new_ticket)
         db.session.commit()
+        
+        # Log ticket creation activity
+        ip_address, user_agent = get_client_info(request)
+        log_user_activity(
+            user_id=current_user.id,
+            session_id=session.id,
+            action_type='create_ticket',
+            resource_type='ticket',
+            resource_id=ticket_id,
+            action_details={
+                'ticket_type': data.get('type'),
+                'status': data.get('status', 'OPEN'),
+                'department': data.get('department'),
+                'customer_name': data.get('name'),
+                'customer_email': data.get('email')
+            },
+            success=True,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        
         return jsonify({"success": True, "ticket_id": ticket_id}), 201
+        
     except Exception as e:
         db.session.rollback()
+        print(f"Create ticket error: {str(e)}")
+        
+        # Log failed ticket creation
+        try:
+            current_user_data = get_jwt_identity()
+            if current_user_data:
+                ip_address, user_agent = get_client_info(request)
+                log_user_activity(
+                    user_id=current_user_data.get('user_id'),
+                    action_type='create_ticket_failed',
+                    action_details={'error': str(e)},
+                    success=False,
+                    error_message=str(e),
+                    ip_address=ip_address,
+                    user_agent=user_agent
+                )
+        except:
+            pass
+            
         return jsonify({"error": str(e)}), 500
 
 
@@ -801,7 +1470,7 @@ def get_appointments():
         result = [
             {
                 "name": ticket.name,
-                "appointment": ticket.appointment,
+                "appointment": validate_appointment_field(ticket.appointment, ticket.created_at),
                 "requested": ticket.requested
             }
             for ticket in tickets
@@ -1585,9 +2254,9 @@ def get_data_by_date():
                 "ชื่อ": row[2],
                 "เบอร์ติดต่อ": row[3],
                 "แผนก": row[4],
-                "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
+                "วันที่แจ้ง": row[5].strftime('%Y-%m-%d %H:%M') if row[5] else "",
                 "สถานะ": row[6],
-                "Appointment": row[7],
+                "Appointment": validate_appointment_field(row[7], row[5]),
                 "Requeste": row[8],
                 "Report": row[9],
                 "Type": row[10],
@@ -1599,6 +2268,118 @@ def get_data_by_date():
             return jsonify({"message": "No data found for the selected date", "data": []})
         return jsonify(result)
     
+    except ValueError:
+        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+# Helper function to validate appointment field
+def validate_appointment_field(appointment_value, created_at_value):
+    """Return None only when appointment exactly equals created_at timestamp.
+    Supports both formats:
+    - Service type: 2025-07-30 08:00-09:00 (time range)
+    - Helpdesk type: 2025-07-30 13:00:28 (timestamp, but not created_at)
+    """
+    if not appointment_value or not created_at_value:
+        return appointment_value
+    
+    # Convert appointment to string and strip whitespace
+    appointment_str = str(appointment_value).strip()
+    
+    # If appointment is empty after stripping, return None
+    if not appointment_str:
+        return None
+    
+    # Convert created_at to exact format for comparison
+    created_at_exact = created_at_value.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Only filter out if appointment EXACTLY matches created_at timestamp
+    # This preserves both Service format (2025-07-30 08:00-09:00) 
+    # and valid Helpdesk timestamps that differ from created_at
+    if appointment_str == created_at_exact:
+        return None  # This is invalid - appointment should not equal created_at
+    
+    # All other formats are valid (Service time ranges, different timestamps, etc.)
+    return appointment_value
+
+# ------------------- API: /api/data-by-date-range -------------------
+@app.route('/api/data-by-date-range', methods=['GET'])
+def get_data_by_date_range():
+    """Return tickets whose created_at falls between start_date and end_date (inclusive).
+    Query params:
+        start_date: YYYY-MM-DD
+        end_date:   YYYY-MM-DD
+    """
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    if not start_date_str or not end_date_str:
+        return jsonify({"error": "start_date and end_date parameters are required"}), 400
+
+    try:
+        # Parse input dates
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+
+        if start_date > end_date:
+            return jsonify({"error": "start_date cannot be after end_date"}), 400
+
+        # Query database
+        conn = psycopg2.connect(
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+        cur = conn.cursor()
+        
+        # Filter by created_at date range using exclusive upper bound
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        # Use next day at 00:00:00 as exclusive upper bound
+        next_day = end_date + timedelta(days=1)
+        end_datetime = datetime.combine(next_day, datetime.min.time())
+        
+        # Filter by created_at date range (removed debug print for production)
+        
+        cur.execute(
+            """
+            SELECT ticket_id, email, name, phone, department,
+                   created_at, status, appointment,
+                   requested, report, type, textbox
+            FROM tickets
+            WHERE created_at >= %s AND created_at < %s
+            ORDER BY created_at DESC
+            """,
+            (start_datetime, end_datetime)
+        )
+
+        rows = cur.fetchall()
+        result = [
+            {
+                "Ticket ID": row[0],
+                "อีเมล": row[1],
+                "ชื่อ": row[2],
+                "เบอร์ติดต่อ": row[3],
+                "แผนก": row[4],
+                "วันที่แจ้ง": row[5].strftime('%Y-%m-%d %H:%M') if row[5] else "",
+                "สถานะ": row[6],
+                "Appointment": validate_appointment_field(row[7], row[5]),
+                "Requeste": row[8],
+                "Report": row[9],
+                "Type": row[10],
+                "TEXTBOX": row[11]
+            }
+            for row in rows
+        ]
+
+        if not rows:
+            return jsonify({"message": "No data found for the selected date range", "data": []})
+        return jsonify(result)
+
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
     except Exception as e:
@@ -1954,9 +2735,9 @@ def sync_simple():
                     "ชื่อ": row[2],
                     "เบอร์ติดต่อ": row[3],
                     "แผนก": row[4],
-                    "วันที่แจ้ง": row[5].isoformat() if row[5] else "",
+                    "วันที่แจ้ง": row[5].strftime('%Y-%m-%d %H:%M') if row[5] else "",
                     "สถานะ": row[6],
-                    "Appointment": row[7],
+                    "Appointment": validate_appointment_field(row[7], row[5]),
                     "Requeste": row[8],
                     "Report": row[9],
                     "Type": row[10],
