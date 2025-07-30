@@ -190,7 +190,7 @@ class User(db.Model):
     username = db.Column(db.String(50), unique=True, nullable=True)  # Username for login
     password_hash = db.Column(db.String(255), nullable=True)  # Hashed password
     email = db.Column(db.String(100), unique=True, nullable=True)  # Email address
-    pin = db.Column(db.String(10), unique=True, nullable=False)  # รหัส PIN
+    pin = db.Column(db.String(10), nullable=False)  # รหัส PIN (no unique constraint - all users use 000000)
     role = db.Column(db.String(20), default='user')  # 'user' หรือ 'admin'
     name = db.Column(db.String(100), nullable=False)  # ชื่อผู้ใช้
     is_active = db.Column(db.Boolean, default=True)  # สถานะการใช้งาน
@@ -706,14 +706,14 @@ def mark_all_notifications_read():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    """Register new user with username, password, email, and PIN"""
+    """Register new user with username, password, email, and name - uses standard PIN 000000"""
     try:
         data = request.get_json()
         if not data:
             return jsonify({'error': 'Missing JSON data'}), 400
         
-        # Validate required fields
-        required_fields = ['username', 'password', 'email', 'pin', 'name']
+        # Validate required fields (PIN is no longer required from user input)
+        required_fields = ['username', 'password', 'email', 'name']
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
@@ -721,9 +721,11 @@ def register():
         username = data['username'].strip()
         password = data['password']
         email = data['email'].strip().lower()
-        pin = data['pin'].strip()
         name = data['name'].strip()
         role = data.get('role', 'user')  # Default to 'user' role
+        
+        # Use standard PIN for all users
+        standard_pin = '000000'
         
         # Validate input lengths and formats
         if len(username) < 3 or len(username) > 50:
@@ -732,17 +734,13 @@ def register():
         if len(password) < 6:
             return jsonify({'error': 'Password must be at least 6 characters'}), 400
         
-        if len(pin) < 4 or len(pin) > 10:
-            return jsonify({'error': 'PIN must be between 4-10 characters'}), 400
-        
         if '@' not in email or len(email) > 100:
             return jsonify({'error': 'Invalid email format'}), 400
         
-        # Check if username, email, or PIN already exists
+        # Check if username or email already exists (no PIN check since all use same PIN)
         existing_user = User.query.filter(
             (User.username == username) | 
-            (User.email == email) | 
-            (User.pin == pin)
+            (User.email == email)
         ).first()
         
         if existing_user:
@@ -750,14 +748,12 @@ def register():
                 return jsonify({'error': 'Username already exists'}), 409
             elif existing_user.email == email:
                 return jsonify({'error': 'Email already exists'}), 409
-            elif existing_user.pin == pin:
-                return jsonify({'error': 'PIN already exists'}), 409
         
-        # Create new user
+        # Create new user with standard PIN
         new_user = User(
             username=username,
             email=email,
-            pin=pin,
+            pin=standard_pin,  # All users use standard PIN
             name=name,
             role=role,
             is_active=True
@@ -775,7 +771,8 @@ def register():
             action_details={
                 'username': username,
                 'email': email,
-                'role': role
+                'role': role,
+                'pin_used': 'standard_000000'
             },
             success=True,
             ip_address=ip_address,
@@ -784,7 +781,15 @@ def register():
         
         return jsonify({
             'message': 'User registered successfully',
-            'user': new_user.to_dict()
+            'user': {
+                'id': new_user.id,
+                'username': new_user.username,
+                'email': new_user.email,
+                'name': new_user.name,
+                'role': new_user.role,
+                'pin': '000000',  # Show standard PIN to user
+                'is_active': new_user.is_active
+            }
         }), 201
         
     except Exception as e:
@@ -3207,6 +3212,7 @@ def api_subgroups():
                 sub_list.remove(s)
                 return jsonify({'success': True})
         return jsonify({'error': 'subgroup not found'}), 404
+
 
 if __name__ == '__main__':
     with app.app_context():
