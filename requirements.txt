@@ -11,3 +11,5 @@ bcrypt
 eventlet
 python-dateutil
 flask-socketio
+Flask-Mail
+apscheduler
