@@ -55,8 +55,8 @@ CORS(app, origins=["*"], supports_credentials=True)
 
 DB_NAME = 'neondb'
 DB_USER = 'neondb_owner'
-DB_PASSWORD = 'npg_EWHCa2rPg7wK'
-DB_HOST = 'ep-dark-math-a1oavnp6-pooler.ap-southeast-1.aws.neon.tech'
+DB_PASSWORD = 'npg_4xWvNOq1rnBI'
+DB_HOST = 'ep-lucky-recipe-a1yjayui-pooler.ap-southeast-1.aws.neon.tech'
 DB_PORT = 5432
 
 # Flask-SQLAlchemy configuration
