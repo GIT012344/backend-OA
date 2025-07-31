@@ -15,7 +15,15 @@ from flask_jwt_extended import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
-from sqlalchemy import desc
+from sqlalchemy import desc, and_, or_
+from flask_mail import Mail, Message as EmailMessage
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+import threading
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import logging
 
 LINE_ACCESS_TOKEN = "O02yXH2dlIyu9da3bJPfhtHTZYkDJR/wy1TnWj5ZAgBUr0zfiNrY9mC3qm5nEWyILuI+rcVftmsvsQZp+AB8Hf6f5UmDosjtkQY0ufX+JrVwa3i+UwlAXa7UvBQ/JBef2pRD4wJ3QttJyLn1nfh1dQdB04t89/1O/w1cDnyilFU="
 
@@ -28,6 +36,19 @@ app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_HEADER_NAME'] = 'Authorization'
 app.config['JWT_HEADER_TYPE'] = 'Bearer'
 jwt = JWTManager(app)
+
+# Email Configuration
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'gemsrobotics443@gmail.com')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'pxfl jhym reyj klan')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'gemsrobotics443@gmail.com')
+mail = Mail(app)
+
+# Logging Configuration
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # JWT Error Handlers
 @jwt.expired_token_loader
@@ -340,6 +361,105 @@ class UserActivityLog(db.Model):
             'error_message': self.error_message
         }
 
+# New models for Email Alert System and Enhanced User Management
+class EmailAlert(db.Model):
+    __tablename__ = 'email_alerts'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    alert_type = db.Column(db.String(50), nullable=False)  # 'new_ticket', 'overdue_ticket'
+    ticket_id = db.Column(db.String, db.ForeignKey('tickets.ticket_id'), nullable=True)
+    recipient_email = db.Column(db.String(100), nullable=False)
+    recipient_name = db.Column(db.String(100), nullable=True)
+    subject = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'sent', 'failed'
+    error_message = db.Column(db.Text, nullable=True)
+    retry_count = db.Column(db.Integer, default=0)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'alert_type': self.alert_type,
+            'ticket_id': self.ticket_id,
+            'recipient_email': self.recipient_email,
+            'recipient_name': self.recipient_name,
+            'subject': self.subject,
+            'sent_at': self.sent_at.isoformat() if self.sent_at else None,
+            'status': self.status,
+            'error_message': self.error_message,
+            'retry_count': self.retry_count
+        }
+
+class EmailTemplate(db.Model):
+    __tablename__ = 'email_templates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    template_type = db.Column(db.String(50), unique=True, nullable=False)  # 'new_ticket', 'overdue_ticket'
+    subject_template = db.Column(db.String(200), nullable=False)
+    body_template = db.Column(db.Text, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'template_type': self.template_type,
+            'subject_template': self.subject_template,
+            'body_template': self.body_template,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class UserPermission(db.Model):
+    __tablename__ = 'user_permissions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    permission_name = db.Column(db.String(50), nullable=False)  # 'view_tickets', 'edit_tickets', 'delete_tickets', 'manage_users', 'receive_email_alerts'
+    granted_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    granted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref='permissions')
+    granted_by_user = db.relationship('User', foreign_keys=[granted_by])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'permission_name': self.permission_name,
+            'granted_by': self.granted_by,
+            'granted_at': self.granted_at.isoformat() if self.granted_at else None,
+            'granted_by_name': self.granted_by_user.name if self.granted_by_user else None
+        }
+
+class AlertSettings(db.Model):
+    __tablename__ = 'alert_settings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    setting_name = db.Column(db.String(50), unique=True, nullable=False)  # 'new_ticket_alert_enabled', 'overdue_days_threshold'
+    setting_value = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    updated_by_user = db.relationship('User', foreign_keys=[updated_by])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'setting_name': self.setting_name,
+            'setting_value': self.setting_value,
+            'description': self.description,
+            'updated_by': self.updated_by,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'updated_by_name': self.updated_by_user.name if self.updated_by_user else None
+        }
+
 # Helper functions for activity logging and session management
 def log_user_activity(user_id=None, session_id=None, action_type=None, resource_type=None, 
                      resource_id=None, action_details=None, success=True, error_message=None, 
@@ -420,6 +540,412 @@ def get_client_info(request):
         ip_address = ip_address.split(',')[0].strip()
     user_agent = request.headers.get('User-Agent', '')
     return ip_address, user_agent
+
+# Email Alert System Functions
+def send_email_alert(recipient_email, recipient_name, subject, body, alert_type, ticket_id=None):
+    """Send email alert and log to database"""
+    try:
+        # Create email alert record
+        email_alert = EmailAlert(
+            alert_type=alert_type,
+            ticket_id=ticket_id,
+            recipient_email=recipient_email,
+            recipient_name=recipient_name,
+            subject=subject,
+            body=body,
+            status='pending'
+        )
+        db.session.add(email_alert)
+        db.session.commit()
+        
+        # Send email using SMTP
+        if send_smtp_email(recipient_email, subject, body):
+            email_alert.status = 'sent'
+            logger.info(f"Email alert sent successfully to {recipient_email}")
+        else:
+            email_alert.status = 'failed'
+            email_alert.error_message = 'SMTP send failed'
+            logger.error(f"Failed to send email alert to {recipient_email}")
+        
+        db.session.commit()
+        return email_alert.status == 'sent'
+        
+    except Exception as e:
+        logger.error(f"Error sending email alert: {str(e)}")
+        db.session.rollback()
+        if 'email_alert' in locals():
+            email_alert.status = 'failed'
+            email_alert.error_message = str(e)
+            db.session.commit()
+        return False
+
+def send_smtp_email(recipient_email, subject, body):
+    """Send email using SMTP"""
+    try:
+        # Get email configuration from environment
+        smtp_server = app.config.get('MAIL_SERVER')
+        smtp_port = app.config.get('MAIL_PORT')
+        smtp_username = app.config.get('MAIL_USERNAME')
+        smtp_password = app.config.get('MAIL_PASSWORD')
+        # Gmail อนุญาตให้ใส่ช่องว่างในหน้าจอแสดงผลรหัสผ่านแอป แต่ต้องลบออกเมื่อใช้งานจริง
+        if smtp_password:
+            smtp_password = smtp_password.replace(' ', '')  # ลบช่องว่างทั้งหมด
+        sender_email = app.config.get('MAIL_DEFAULT_SENDER')
+        
+        if not all([smtp_server, smtp_username, smtp_password, sender_email]):
+            logger.error("Email configuration incomplete")
+            return False
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        
+        # Create HTML body
+        html_body = f"""
+        <html>
+          <body>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #005BBB; color: white; padding: 20px; text-align: center;">
+                <h1>🎫 Ticket Management System</h1>
+              </div>
+              <div style="padding: 20px; background-color: #f9f9f9;">
+                {body.replace(chr(10), '<br>')}
+              </div>
+              <div style="background-color: #e9e9e9; padding: 10px; text-align: center; font-size: 12px; color: #666;">
+                <p>This is an automated message from the Ticket Management System</p>
+              </div>
+            </div>
+          </body>
+        </html>
+        """
+        
+        # Attach parts
+        part1 = MIMEText(body, 'plain')
+        part2 = MIMEText(html_body, 'html')
+        msg.attach(part1)
+        msg.attach(part2)
+        
+        # Send email
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            if app.config.get('MAIL_USE_TLS'):
+                server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"SMTP error: {str(e)}")
+        return False
+
+def get_all_users_for_alerts():
+    """Get single user who should receive email alerts"""
+    try:
+        # ส่งไปแค่อีเมลเดียว - เปลี่ยนอีเมลตรงนี้
+        ALERT_EMAIL = "gemsrobotics443@gmail.com"  # เปลี่ยนเป็นอีเมลที่ต้องการ
+        ALERT_NAME = "ผู้ดูแลระบบ"  # เปลี่ยนเป็นชื่อที่ต้องการ
+        
+        # สร้าง object แบบ User สำหรับส่งอีเมล
+        class AlertRecipient:
+            def __init__(self, email, name):
+                self.email = email
+                self.name = name
+        
+        return [AlertRecipient(ALERT_EMAIL, ALERT_NAME)]
+        
+    except Exception as e:
+        logger.error(f"Error getting users for alerts: {str(e)}")
+        return []
+
+def send_new_ticket_alerts(ticket):
+    """Send email alerts for new tickets"""
+    try:
+        print(f"📧 DEBUG: Starting email alert for ticket {ticket.ticket_id}")
+        
+        # Check if new ticket alerts are enabled
+        setting = AlertSettings.query.filter_by(setting_name='new_ticket_alert_enabled').first()
+        print(f"🔍 DEBUG: Alert setting found: {setting.setting_value if setting else 'None'}")
+        
+        if not setting:
+            print(f"❌ DEBUG: Alert setting not found, creating default setting")
+            # Create default setting
+            setting = AlertSettings(
+                setting_name='new_ticket_alert_enabled',
+                setting_value='true',
+                description='Enable email alerts for new tickets'
+            )
+            db.session.add(setting)
+            db.session.commit()
+            print(f"✅ DEBUG: Default alert setting created and enabled")
+        
+        if setting.setting_value.lower() != 'true':
+            print(f"⚠️ DEBUG: New ticket alerts are disabled")
+            return
+        
+        # Get email template
+        template = EmailTemplate.query.filter_by(template_type='new_ticket', is_active=True).first()
+        print(f"📋 DEBUG: Email template found: {template is not None}")
+        
+        if not template:
+            print(f"❌ DEBUG: No email template found, creating default template")
+            # Create default template if not exists
+            template = EmailTemplate(
+                template_type='new_ticket',
+                subject_template='[Ticket #{ticket_id}] ทิกเก็ตใหม่จาก {name}',
+                body_template='''เรียน ผู้ใช้ระบบ,
+
+มีทิกเก็ตใหม่เข้ามาในระบบ:
+
+📋 รหัสทิกเก็ต: {ticket_id}
+👤 ชื่อลูกค้า: {name}
+📧 อีเมล: {email}
+📞 เบอร์โทร: {phone}
+🏢 แผนก: {department}
+📝 ประเภท: {type}
+📄 รายงาน: {report}
+🎯 ความต้องการ: {requested}
+📅 วันที่สร้าง: {created_at}
+
+กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อไป
+
+ขอบคุณครับ''',
+                is_active=True
+            )
+            db.session.add(template)
+            db.session.commit()
+            print(f"✅ DEBUG: Default email template created")
+        
+        # Get all users to notify
+        all_users = get_all_users_for_alerts()
+        print(f"👥 DEBUG: Found {len(all_users)} users for alerts")
+        
+        if not all_users:
+            print(f"❌ DEBUG: No users found for email alerts")
+            return
+        
+        # Prepare email content
+        subject = template.subject_template.format(
+            ticket_id=ticket.ticket_id,
+            name=ticket.name or 'N/A',
+            department=ticket.department or 'N/A'
+        )
+        
+        body = template.body_template.format(
+            ticket_id=ticket.ticket_id,
+            name=ticket.name or 'N/A',
+            email=ticket.email or 'N/A',
+            phone=ticket.phone or 'N/A',
+            department=ticket.department or 'N/A',
+            type=ticket.type or 'N/A',
+            report=ticket.report or 'N/A',
+            requested=ticket.requested or 'N/A',
+            created_at=ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'
+        )
+        
+        # Send alerts to all users
+        for user in all_users:
+            print(f"📨 DEBUG: Sending email to {user.email} ({user.name})")
+            try:
+                result = send_email_alert(
+                    recipient_email=user.email,
+                    recipient_name=user.name,
+                    subject=subject,
+                    body=body,
+                    alert_type='new_ticket',
+                    ticket_id=ticket.ticket_id
+                )
+                print(f"✅ DEBUG: Email sent successfully to {user.email}")
+            except Exception as send_error:
+                print(f"❌ DEBUG: Failed to send email to {user.email}: {str(send_error)}")
+        
+        print(f"🎉 DEBUG: New ticket alerts process completed for ticket {ticket.ticket_id}")
+        
+    except Exception as e:
+        logger.error(f"Error sending new ticket alerts: {str(e)}")
+
+def check_and_send_overdue_alerts():
+    """Check for overdue tickets and send email alerts"""
+    try:
+        # Check if overdue alerts are enabled
+        setting = AlertSettings.query.filter_by(setting_name='overdue_alert_enabled').first()
+        if not setting or setting.setting_value.lower() != 'true':
+            return
+        
+        # Get overdue threshold in days
+        threshold_setting = AlertSettings.query.filter_by(setting_name='overdue_days_threshold').first()
+        overdue_days = int(threshold_setting.setting_value) if threshold_setting else 3
+        
+        # Calculate cutoff date
+        cutoff_date = datetime.utcnow() - timedelta(days=overdue_days)
+        
+        # Find overdue tickets (status 'New' or 'Pending' and older than 3 days)
+        overdue_tickets = Ticket.query.filter(
+            and_(
+                Ticket.created_at < cutoff_date,
+                Ticket.status.in_(['New', 'Pending'])
+            )
+        ).all()
+        
+        if not overdue_tickets:
+            logger.info("No overdue tickets found")
+            return
+        
+        # Get email template
+        template = EmailTemplate.query.filter_by(template_type='overdue_ticket', is_active=True).first()
+        if not template:
+            logger.warning("No active email template found for overdue_ticket")
+            return
+        
+        # Get all users to notify
+        all_users = get_all_users_for_alerts()
+        if not all_users:
+            logger.warning("No users found for email alerts")
+            return
+        
+        # Group tickets and send summary email
+        ticket_list = "\n".join([
+            f"- {ticket.ticket_id}: {ticket.name} ({ticket.department}) - {ticket.status} - Created: {ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'}"
+            for ticket in overdue_tickets
+        ])
+        
+        subject = template.subject_template.format(
+            count=len(overdue_tickets),
+            days=overdue_days
+        )
+        
+        body = template.body_template.format(
+            count=len(overdue_tickets),
+            days=overdue_days,
+            ticket_list=ticket_list,
+            current_date=datetime.now().strftime('%d/%m/%Y %H:%M')
+        )
+        
+        # Send alerts to all users
+        for user in all_users:
+            send_email_alert(
+                recipient_email=user.email,
+                recipient_name=user.name,
+                subject=subject,
+                body=body,
+                alert_type='overdue_ticket'
+            )
+        
+        logger.info(f"Overdue ticket alerts sent for {len(overdue_tickets)} tickets")
+        
+    except Exception as e:
+        logger.error(f"Error checking and sending overdue alerts: {str(e)}")
+
+def check_and_alert_new_tickets(tickets):
+    """Check for new tickets and send email alerts"""
+    try:
+        # ใช้ cache เพื่อเก็บ ticket IDs ที่เคยส่งแจ้งเตือนแล้ว
+        cache_key = 'alerted_ticket_ids'
+        alerted_ticket_ids = cache.get(cache_key) or set()
+        
+        new_tickets_found = []
+        
+        # ตรวจสอบทิกเก็ตใหม่ (ที่ยังไม่เคยส่งแจ้งเตือน)
+        for ticket in tickets:
+            if ticket.ticket_id not in alerted_ticket_ids:
+                new_tickets_found.append(ticket)
+                alerted_ticket_ids.add(ticket.ticket_id)
+        
+        # อัพเดท cache ด้วย ticket IDs ใหม่
+        cache.set(cache_key, alerted_ticket_ids, timeout=86400)  # เก็บไว้ 24 ชั่วโมง
+        
+        # ส่งอีเมลแจ้งเตือนสำหรับทิกเก็ตใหม่
+        if new_tickets_found:
+            print(f"🔔 Found {len(new_tickets_found)} new tickets, sending email alerts...")
+            
+            for ticket in new_tickets_found:
+                try:
+                    print(f"📧 Sending alert for new ticket: {ticket.ticket_id}")
+                    send_new_ticket_alerts(ticket)
+                    print(f"✅ Alert sent for ticket: {ticket.ticket_id}")
+                except Exception as email_error:
+                    print(f"❌ Failed to send alert for ticket {ticket.ticket_id}: {str(email_error)}")
+        else:
+            print("ℹ️ No new tickets found")
+            
+    except Exception as e:
+        print(f"❌ Error in check_and_alert_new_tickets: {str(e)}")
+        logger.error(f"Error checking new tickets: {str(e)}")
+
+@app.route('/api/clear-alert-cache', methods=['POST'])
+@jwt_required()
+def clear_alert_cache():
+    """Clear the alerted tickets cache (for testing)"""
+    try:
+        current_user_data = get_jwt_identity()
+        current_user = User.query.get(current_user_data['user_id'])
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        cache_key = 'alerted_ticket_ids'
+        cache.delete(cache_key)
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Alert cache cleared successfully. New tickets will trigger alerts again.'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/test-overdue-alerts', methods=['POST'])
+@jwt_required()
+def test_overdue_alerts():
+    """Test overdue ticket alerts manually"""
+    try:
+        current_user_data = get_jwt_identity()
+        current_user = User.query.get(current_user_data['user_id'])
+        
+        if not current_user or current_user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        # รันการตรวจสอบทิกเก็ตค้าง
+        check_and_send_overdue_alerts()
+        
+        # นับจำนวนทิกเก็ตค้าง
+        cutoff_date = datetime.utcnow() - timedelta(days=3)
+        overdue_count = Ticket.query.filter(
+            and_(
+                Ticket.created_at < cutoff_date,
+                Ticket.status.in_(['New', 'Pending'])
+            )
+        ).count()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Overdue alerts check completed. Found {overdue_count} overdue tickets (New/Pending status, older than 3 days).'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def has_permission(user, permission_name):
+    """Check if user has specific permission"""
+    try:
+        if not user or not user.is_active:
+            return False
+        
+        # Admin users have all permissions
+        if user.role == 'admin':
+            return True
+        
+        # Check specific permission
+        permission = UserPermission.query.filter_by(
+            user_id=user.id,
+            permission_name=permission_name
+        ).first()
+        
+        return permission is not None
+    except Exception as e:
+        logger.error(f"Error checking permission: {str(e)}")
+        return False
 
 def send_textbox_message(user_id, message_text):
     url = "https://api.line.me/v2/bot/message/push"
@@ -1270,6 +1796,12 @@ def get_data():
         # Use SQLAlchemy to query tickets
         tickets = Ticket.query.order_by(Ticket.created_at.desc()).limit(1000).all()
         
+        # ตรวจสอบทิกเก็ตใหม่และส่งอีเมลแจ้งเตือน
+        check_and_alert_new_tickets(tickets)
+        
+        # ตรวจสอบทิกเก็ตค้าง 3 วัน (สถานะ New/Pending)
+        check_and_send_overdue_alerts()
+        
         result = [
             {
                 "Ticket ID": ticket.ticket_id,
@@ -1339,7 +1871,7 @@ def save_type_group_subgroup():
 
 # ---------- Ticket create & update endpoints ----------
 
-@app.route('/create-ticket', methods=['POST'])
+@app.route('/create-ticket', methods=['GET', 'POST'])
 @jwt_required()
 def create_ticket():
     """Create a new ticket with user activity logging"""
@@ -1403,6 +1935,14 @@ def create_ticket():
             ip_address=ip_address,
             user_agent=user_agent
         )
+        
+        # Send email alerts for new ticket
+        print(f"🔔 DEBUG: Attempting to send email alerts for ticket {ticket_id}")
+        try:
+            send_new_ticket_alerts(new_ticket)
+            print(f"✅ DEBUG: Email alert function completed for ticket {ticket_id}")
+        except Exception as email_error:
+            print(f"❌ DEBUG: Email alert failed: {str(email_error)}")
         
         return jsonify({"success": True, "ticket_id": ticket_id}), 201
         
@@ -3213,9 +3753,702 @@ def api_subgroups():
                 return jsonify({'success': True})
         return jsonify({'error': 'subgroup not found'}), 404
 
+# ================= EMAIL ALERT MANAGEMENT APIs =================
+
+@app.route('/api/email-alerts', methods=['GET'])
+@jwt_required()
+def get_email_alerts():
+    """Get email alert history"""
+    try:
+        user = get_user_from_token()
+        if not user or not has_permission(user, 'manage_users'):
+            return jsonify({'error': 'Insufficient permissions'}), 403
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        alert_type = request.args.get('type')
+        status = request.args.get('status')
+        
+        query = EmailAlert.query
+        
+        if alert_type:
+            query = query.filter(EmailAlert.alert_type == alert_type)
+        if status:
+            query = query.filter(EmailAlert.status == status)
+        
+        alerts = query.order_by(EmailAlert.sent_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return jsonify({
+            'alerts': [alert.to_dict() for alert in alerts.items],
+            'total': alerts.total,
+            'pages': alerts.pages,
+            'current_page': page
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting email alerts: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/email-templates', methods=['GET', 'POST', 'PUT'])
+@jwt_required()
+def manage_email_templates():
+    """Manage email templates"""
+    try:
+        user = get_user_from_token()
+        if not user or not has_permission(user, 'manage_users'):
+            return jsonify({'error': 'Insufficient permissions'}), 403
+        
+        if request.method == 'GET':
+            templates = EmailTemplate.query.all()
+            return jsonify([template.to_dict() for template in templates])
+        
+        elif request.method == 'POST':
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Missing JSON data'}), 400
+            
+            required_fields = ['template_type', 'subject_template', 'body_template']
+            for field in required_fields:
+                if field not in data or not data[field]:
+                    return jsonify({'error': f'Missing required field: {field}'}), 400
+            
+            # Check if template type already exists
+            existing = EmailTemplate.query.filter_by(template_type=data['template_type']).first()
+            if existing:
+                return jsonify({'error': 'Template type already exists'}), 409
+            
+            template = EmailTemplate(
+                template_type=data['template_type'],
+                subject_template=data['subject_template'],
+                body_template=data['body_template'],
+                is_active=data.get('is_active', True)
+            )
+            
+            db.session.add(template)
+            db.session.commit()
+            
+            return jsonify(template.to_dict()), 201
+        
+        elif request.method == 'PUT':
+            data = request.get_json()
+            if not data or 'id' not in data:
+                return jsonify({'error': 'Missing template ID'}), 400
+            
+            template = EmailTemplate.query.get(data['id'])
+            if not template:
+                return jsonify({'error': 'Template not found'}), 404
+            
+            # Update fields
+            if 'subject_template' in data:
+                template.subject_template = data['subject_template']
+            if 'body_template' in data:
+                template.body_template = data['body_template']
+            if 'is_active' in data:
+                template.is_active = data['is_active']
+            
+            db.session.commit()
+            return jsonify(template.to_dict())
+        
+    except Exception as e:
+        logger.error(f"Error managing email templates: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/alert-settings', methods=['GET', 'POST', 'PUT'])
+@jwt_required()
+def manage_alert_settings():
+    """Manage alert settings"""
+    try:
+        user = get_user_from_token()
+        if not user or not has_permission(user, 'manage_users'):
+            return jsonify({'error': 'Insufficient permissions'}), 403
+        
+        if request.method == 'GET':
+            settings = AlertSettings.query.all()
+            return jsonify([setting.to_dict() for setting in settings])
+        
+        elif request.method == 'POST':
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Missing JSON data'}), 400
+            
+            required_fields = ['setting_name', 'setting_value']
+            for field in required_fields:
+                if field not in data or not data[field]:
+                    return jsonify({'error': f'Missing required field: {field}'}), 400
+            
+            # Check if setting already exists
+            existing = AlertSettings.query.filter_by(setting_name=data['setting_name']).first()
+            if existing:
+                return jsonify({'error': 'Setting already exists'}), 409
+            
+            setting = AlertSettings(
+                setting_name=data['setting_name'],
+                setting_value=data['setting_value'],
+                description=data.get('description'),
+                updated_by=user.id
+            )
+            
+            db.session.add(setting)
+            db.session.commit()
+            
+            return jsonify(setting.to_dict()), 201
+        
+        elif request.method == 'PUT':
+            data = request.get_json()
+            if not data or 'id' not in data:
+                return jsonify({'error': 'Missing setting ID'}), 400
+            
+            setting = AlertSettings.query.get(data['id'])
+            if not setting:
+                return jsonify({'error': 'Setting not found'}), 404
+            
+            # Update fields
+            if 'setting_value' in data:
+                setting.setting_value = data['setting_value']
+            if 'description' in data:
+                setting.description = data['description']
+            
+            setting.updated_by = user.id
+            
+            db.session.commit()
+            return jsonify(setting.to_dict())
+        
+    except Exception as e:
+        logger.error(f"Error managing alert settings: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+# ================= USER MANAGEMENT APIs =================
+
+@app.route('/api/users', methods=['GET', 'POST'])
+@jwt_required()
+def manage_users():
+    """Get all users or create new user"""
+    try:
+        user = get_user_from_token()
+        if not user or not has_permission(user, 'manage_users'):
+            return jsonify({'error': 'Insufficient permissions'}), 403
+        
+        if request.method == 'GET':
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+            role_filter = request.args.get('role')
+            active_filter = request.args.get('active')
+            
+            query = User.query
+            
+            if role_filter:
+                query = query.filter(User.role == role_filter)
+            if active_filter is not None:
+                query = query.filter(User.is_active == (active_filter.lower() == 'true'))
+            
+            users = query.order_by(User.created_at.desc()).paginate(
+                page=page, per_page=per_page, error_out=False
+            )
+            
+            return jsonify({
+                'users': [user.to_dict() for user in users.items],
+                'total': users.total,
+                'pages': users.pages,
+                'current_page': page
+            })
+        
+        elif request.method == 'POST':
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Missing JSON data'}), 400
+            
+            required_fields = ['username', 'password', 'email', 'name']
+            for field in required_fields:
+                if field not in data or not data[field]:
+                    return jsonify({'error': f'Missing required field: {field}'}), 400
+            
+            # Check if username or email already exists
+            existing_user = User.query.filter(
+                (User.username == data['username']) | 
+                (User.email == data['email'])
+            ).first()
+            
+            if existing_user:
+                if existing_user.username == data['username']:
+                    return jsonify({'error': 'Username already exists'}), 409
+                elif existing_user.email == data['email']:
+                    return jsonify({'error': 'Email already exists'}), 409
+            
+            # Create new user
+            new_user = User(
+                username=data['username'],
+                email=data['email'],
+                pin='000000',  # Standard PIN
+                name=data['name'],
+                role=data.get('role', 'user'),
+                is_active=data.get('is_active', True)
+            )
+            new_user.set_password(data['password'])
+            
+            db.session.add(new_user)
+            db.session.commit()
+            
+            # Log activity
+            log_user_activity(
+                user_id=user.id,
+                action_type='create_user',
+                resource_type='user',
+                resource_id=str(new_user.id),
+                action_details={'created_user': new_user.username}
+            )
+            
+            return jsonify(new_user.to_dict()), 201
+        
+    except Exception as e:
+        logger.error(f"Error managing users: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/users/<int:user_id>', methods=['GET', 'PUT', 'DELETE'])
+@jwt_required()
+def manage_user_by_id(user_id):
+    """Get, update, or delete specific user"""
+    try:
+        current_user = get_user_from_token()
+        if not current_user or not has_permission(current_user, 'manage_users'):
+            return jsonify({'error': 'Insufficient permissions'}), 403
+        
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        if request.method == 'GET':
+            return jsonify(target_user.to_dict())
+        
+        elif request.method == 'PUT':
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Missing JSON data'}), 400
+            
+            # Update fields
+            if 'name' in data:
+                target_user.name = data['name']
+            if 'email' in data:
+                # Check if email already exists for another user
+                existing = User.query.filter(User.email == data['email'], User.id != user_id).first()
+                if existing:
+                    return jsonify({'error': 'Email already exists'}), 409
+                target_user.email = data['email']
+            if 'role' in data:
+                target_user.role = data['role']
+            if 'is_active' in data:
+                target_user.is_active = data['is_active']
+            if 'password' in data and data['password']:
+                target_user.set_password(data['password'])
+            
+            db.session.commit()
+            
+            # Log activity
+            log_user_activity(
+                user_id=current_user.id,
+                action_type='update_user',
+                resource_type='user',
+                resource_id=str(user_id),
+                action_details={'updated_user': target_user.username}
+            )
+            
+            return jsonify(target_user.to_dict())
+        
+        elif request.method == 'DELETE':
+            # Prevent deleting self
+            if target_user.id == current_user.id:
+                return jsonify({'error': 'Cannot delete your own account'}), 400
+            
+            # Log activity before deletion
+            log_user_activity(
+                user_id=current_user.id,
+                action_type='delete_user',
+                resource_type='user',
+                resource_id=str(user_id),
+                action_details={'deleted_user': target_user.username}
+            )
+            
+            db.session.delete(target_user)
+            db.session.commit()
+            
+            return jsonify({'success': True})
+        
+    except Exception as e:
+        logger.error(f"Error managing user {user_id}: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/users/<int:user_id>/permissions', methods=['GET', 'POST', 'DELETE'])
+@jwt_required()
+def manage_user_permissions(user_id):
+    """Manage user permissions"""
+    try:
+        current_user = get_user_from_token()
+        if not current_user or not has_permission(current_user, 'manage_users'):
+            return jsonify({'error': 'Insufficient permissions'}), 403
+        
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        if request.method == 'GET':
+            permissions = UserPermission.query.filter_by(user_id=user_id).all()
+            return jsonify([perm.to_dict() for perm in permissions])
+        
+        elif request.method == 'POST':
+            data = request.get_json()
+            if not data or 'permission_name' not in data:
+                return jsonify({'error': 'Missing permission_name'}), 400
+            
+            # Check if permission already exists
+            existing = UserPermission.query.filter_by(
+                user_id=user_id,
+                permission_name=data['permission_name']
+            ).first()
+            
+            if existing:
+                return jsonify({'error': 'Permission already granted'}), 409
+            
+            permission = UserPermission(
+                user_id=user_id,
+                permission_name=data['permission_name'],
+                granted_by=current_user.id
+            )
+            
+            db.session.add(permission)
+            db.session.commit()
+            
+            # Log activity
+            log_user_activity(
+                user_id=current_user.id,
+                action_type='grant_permission',
+                resource_type='permission',
+                resource_id=str(permission.id),
+                action_details={
+                    'user': target_user.username,
+                    'permission': data['permission_name']
+                }
+            )
+            
+            return jsonify(permission.to_dict()), 201
+        
+        elif request.method == 'DELETE':
+            data = request.get_json()
+            if not data or 'permission_name' not in data:
+                return jsonify({'error': 'Missing permission_name'}), 400
+            
+            permission = UserPermission.query.filter_by(
+                user_id=user_id,
+                permission_name=data['permission_name']
+            ).first()
+            
+            if not permission:
+                return jsonify({'error': 'Permission not found'}), 404
+            
+            # Log activity before deletion
+            log_user_activity(
+                user_id=current_user.id,
+                action_type='revoke_permission',
+                resource_type='permission',
+                resource_id=str(permission.id),
+                action_details={
+                    'user': target_user.username,
+                    'permission': data['permission_name']
+                }
+            )
+            
+            db.session.delete(permission)
+            db.session.commit()
+            
+            return jsonify({'success': True})
+        
+    except Exception as e:
+        logger.error(f"Error managing permissions for user {user_id}: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+
+# ================= DATABASE INITIALIZATION =================
+
+def create_email_alert_tables():
+    """Create email alert related tables"""
+    try:
+        with app.app_context():
+            # Create all new tables
+            db.create_all()
+            
+            # Initialize default email templates
+            init_default_email_templates()
+            
+            # Initialize default alert settings
+            init_default_alert_settings()
+            
+            logger.info("Email alert tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating email alert tables: {str(e)}")
+
+
+
+def init_default_email_templates():
+    """Initialize default email templates"""
+    try:
+        templates = [
+            {
+                'template_type': 'new_ticket',
+                'subject_template': '[Ticket #{ticket_id}] ทิกเก็ตใหม่จาก {name}',
+                'body_template': '''เรียน ผู้ใช้ระบบ,
+
+มีทิกเก็ตใหม่เข้ามาในระบบ:
+
+📋 รหัสทิกเก็ต: {ticket_id}
+👤 ชื่อลูกค้า: {name}
+📧 อีเมล: {email}
+📞 เบอร์โทร: {phone}
+🏢 แผนก: {department}
+📝 ประเภท: {type}
+📄 รายงาน: {report}
+🎯 ความต้องการ: {requested}
+📅 วันที่สร้าง: {created_at}
+
+กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อไป
+
+ขอบคุณครับ'''
+            },
+            {
+                'template_type': 'overdue_ticket',
+                'subject_template': '⚠️ แจ้งเตือน: มีทิกเก็ตค้างคา {count} รายการ (เกิน {days} วัน)',
+                'body_template': '''เรียน ผู้ใช้ระบบ,
+
+มีทิกเก็ตที่ค้างคามานานเกิน {days} วัน จำนวน {count} รายการ:
+
+{ticket_list}
+
+กรุณาเข้าสู่ระบบเพื่อดำเนินการให้เสร็จสิ้น
+
+วันที่ตรวจสอบ: {current_date}
+
+ขอบคุณครับ'''
+            }
+        ]
+        
+        for template_data in templates:
+            existing = EmailTemplate.query.filter_by(template_type=template_data['template_type']).first()
+            if not existing:
+                template = EmailTemplate(
+                    template_type=template_data['template_type'],
+                    subject_template=template_data['subject_template'],
+                    body_template=template_data['body_template']
+                )
+                db.session.add(template)
+        
+        db.session.commit()
+        logger.info("Default email templates initialized")
+        
+    except Exception as e:
+        logger.error(f"Error initializing email templates: {str(e)}")
+        db.session.rollback()
+
+def init_default_alert_settings():
+    """Initialize default alert settings"""
+    try:
+        settings = [
+            {
+                'setting_name': 'new_ticket_alert_enabled',
+                'setting_value': 'true',
+                'description': 'Enable email alerts for new tickets'
+            },
+            {
+                'setting_name': 'overdue_alert_enabled',
+                'setting_value': 'true',
+                'description': 'Enable email alerts for overdue tickets'
+            },
+            {
+                'setting_name': 'overdue_days_threshold',
+                'setting_value': '3',
+                'description': 'Number of days after which a ticket is considered overdue'
+            }
+        ]
+        
+        for setting_data in settings:
+            existing = AlertSettings.query.filter_by(setting_name=setting_data['setting_name']).first()
+            if not existing:
+                setting = AlertSettings(
+                    setting_name=setting_data['setting_name'],
+                    setting_value=setting_data['setting_value'],
+                    description=setting_data['description']
+                )
+                db.session.add(setting)
+        
+        db.session.commit()
+        logger.info("Default alert settings initialized")
+        
+    except Exception as e:
+        logger.error(f"Error initializing alert settings: {str(e)}")
+        db.session.rollback()
+
+@app.route('/api/simple-email-alerts', methods=['GET'])
+def get_simple_email_alerts():
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        status = request.args.get('status', '')
+        date_from = request.args.get('dateFrom', '')
+        date_to = request.args.get('dateTo', '')
+        
+        # ใช้ raw SQL query แทน SQLAlchemy
+        conn = psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
+            host=DB_HOST, port=DB_PORT
+        )
+        cur = conn.cursor()
+        
+        # สร้างตาราง email_alerts ถ้ายังไม่มี
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS email_alerts (
+                id SERIAL PRIMARY KEY,
+                recipient_email TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                body TEXT,
+                status TEXT DEFAULT 'sent',
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                error_message TEXT
+            )
+        ''')
+        
+        # Query ข้อมูล
+        query = "SELECT * FROM email_alerts WHERE 1=1"
+        params = []
+        
+        if status:
+            query += " AND status = %s"
+            params.append(status)
+        if date_from:
+            query += " AND sent_at >= %s"
+            params.append(date_from)
+        if date_to:
+            query += " AND sent_at <= %s"
+            params.append(date_to)
+            
+        query += " ORDER BY sent_at DESC LIMIT %s OFFSET %s"
+        params.extend([per_page, (page - 1) * per_page])
+        
+        cur.execute(query, params)
+        alerts = cur.fetchall()
+        
+        # แปลงเป็น dict
+        columns = [desc[0] for desc in cur.description]
+        result = [dict(zip(columns, row)) for row in alerts]
+        
+        conn.close()
+        
+        return jsonify({
+            'alerts': result,
+            'total': len(result),
+            'page': page,
+            'per_page': per_page
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def create_email_alert_tables():
+    """Create email alert related tables and initialize default data"""
+    try:
+        # Create all tables
+        db.create_all()
+        
+        # Initialize default email templates
+        init_default_email_templates()
+        
+        # Initialize default alert settings
+        init_default_alert_settings()
+        
+        logger.info("Email alert tables created and initialized")
+        
+    except Exception as e:
+        logger.error(f"Error creating email alert tables: {str(e)}")
+
+@app.route('/api/test-email', methods=['POST'])
+@jwt_required()
+def test_email():
+    """Test email sending functionality"""
+    try:
+        current_user = get_user_from_token()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        data = request.get_json()
+        recipient_email = data.get('email', current_user.email)
+        
+        if not recipient_email:
+            return jsonify({'error': 'No email address provided'}), 400
+        
+        # Test email content
+        subject = 'ทดสอบระบบอีเมลแจ้งเตือน - Test Email Alert System'
+        body = f'''เรียน {current_user.name},
+
+นี่คือการทดสอบระบบอีเมลแจ้งเตือนของระบบ Ticket Management
+
+✅ ระบบอีเมลทำงานปกติ
+📧 อีเมลผู้ส่ง: {app.config['MAIL_USERNAME']}
+📧 อีเมลผู้รับ: {recipient_email}
+🕐 เวลาที่ส่ง: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+
+ขอบคุณครับ
+ระบบ Ticket Management'''
+        
+        # Send test email
+        success = send_smtp_email(recipient_email, subject, body)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Test email sent successfully to {recipient_email}'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to send test email'
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error sending test email: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Duplicate endpoint removed - using the one defined earlier
+
+def setup_scheduler():
+    """Setup background scheduler for overdue alerts"""
+    try:
+        scheduler = BackgroundScheduler()
+        
+        # Schedule overdue alerts check every day at 9:00 AM
+        scheduler.add_job(
+            func=check_and_send_overdue_alerts,
+            trigger='cron',
+            hour=9,
+            minute=0,
+            id='overdue_alerts_job'
+        )
+        
+        scheduler.start()
+        logger.info("Scheduler started for overdue alerts")
+        
+        # Ensure scheduler shuts down when app exits
+        import atexit
+        atexit.register(lambda: scheduler.shutdown())
+        
+    except Exception as e:
+        logger.error(f"Error setting up scheduler: {str(e)}")
+
 
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
         create_ticket_status_logs_table()
+        create_email_alert_tables()
+    
+    # Setup scheduler for overdue alerts
+    setup_scheduler()
+    
     app.run(host='0.0.0.0', port=5001, debug=False)
