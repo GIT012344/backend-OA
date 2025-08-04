@@ -37,14 +37,19 @@ app.config['JWT_HEADER_NAME'] = 'Authorization'
 app.config['JWT_HEADER_TYPE'] = 'Bearer'
 jwt = JWTManager(app)
 
-# Email Configuration
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'gemsrobotics443@gmail.com')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'pxfl jhym reyj klan')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'gemsrobotics443@gmail.com')
+# Email Configuration - Office 365 (webmaster@git.or.th)
+app.config['MAIL_SERVER'] = 'smtp.office365.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = 'webmaster@git.or.th'
+app.config['MAIL_PASSWORD'] = '2566#Web@th'
+app.config['MAIL_DEFAULT_SENDER'] = 'webmaster@git.or.th'
 mail = Mail(app)
+
+# Alert recipient configuration
+ALERT_RECIPIENT_EMAIL = 'it@git.or.th'
+ALERT_RECIPIENT_NAME = 'IT Support'
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO)
@@ -103,8 +108,6 @@ class Ticket(db.Model):
     type = db.Column(db.String)
     textbox = db.Column(db.String)
     subgroup = db.Column(db.String)
-    # Relationship to cascade delete messages when a ticket is removed
-    messages = db.relationship('Message', backref='ticket', cascade='all, delete, delete-orphan', passive_deletes=True)
 class Notification(db.Model):
     __tablename__ = 'notifications'
     
@@ -144,10 +147,10 @@ class Notification(db.Model):
 class Message(db.Model):
     __tablename__ = 'messages'
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.ticket_id', ondelete='CASCADE'), nullable=False)
-    user_id = db.Column(db.String, nullable=False)
+    ticket_id = db.Column(db.String, nullable=True)  # Allow messages without tickets
+    user_id = db.Column(db.String, nullable=False)   # LINE User ID or similar
     admin_id = db.Column(db.String, nullable=True)
-    sender_type = db.Column(db.String, nullable=False)  # 'user' or 'admin', ป้องกัน null
+    sender_type = db.Column(db.String, nullable=False)  # 'user' or 'admin'
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -505,7 +508,7 @@ def get_session_from_token():
     try:
         from flask_jwt_extended import get_jwt
         
-        # Get additional claims from JWT
+     
         claims = get_jwt()
         session_token = claims.get('session_token')
         
@@ -558,7 +561,7 @@ def send_email_alert(recipient_email, recipient_name, subject, body, alert_type,
         db.session.add(email_alert)
         db.session.commit()
         
-        # Send email using SMTP
+        
         if send_smtp_email(recipient_email, subject, body):
             email_alert.status = 'sent'
             logger.info(f"Email alert sent successfully to {recipient_email}")
@@ -582,21 +585,21 @@ def send_email_alert(recipient_email, recipient_name, subject, body, alert_type,
 def send_smtp_email(recipient_email, subject, body):
     """Send email using SMTP"""
     try:
-        # Get email configuration from environment
+      
         smtp_server = app.config.get('MAIL_SERVER')
         smtp_port = app.config.get('MAIL_PORT')
         smtp_username = app.config.get('MAIL_USERNAME')
         smtp_password = app.config.get('MAIL_PASSWORD')
-        # Gmail อนุญาตให้ใส่ช่องว่างในหน้าจอแสดงผลรหัสผ่านแอป แต่ต้องลบออกเมื่อใช้งานจริง
+       
         if smtp_password:
-            smtp_password = smtp_password.replace(' ', '')  # ลบช่องว่างทั้งหมด
+            smtp_password = smtp_password.replace(' ', '')  
         sender_email = app.config.get('MAIL_DEFAULT_SENDER')
         
         if not all([smtp_server, smtp_username, smtp_password, sender_email]):
             logger.error("Email configuration incomplete")
             return False
         
-        # Create message
+        
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = sender_email
@@ -621,7 +624,7 @@ def send_smtp_email(recipient_email, subject, body):
         </html>
         """
         
-        # Attach parts
+  
         part1 = MIMEText(body, 'plain')
         part2 = MIMEText(html_body, 'html')
         msg.attach(part1)
@@ -643,11 +646,11 @@ def send_smtp_email(recipient_email, subject, body):
 def get_all_users_for_alerts():
     """Get single user who should receive email alerts"""
     try:
-        # ส่งไปแค่อีเมลเดียว - เปลี่ยนอีเมลตรงนี้
-        ALERT_EMAIL = "gemsrobotics443@gmail.com"  # เปลี่ยนเป็นอีเมลที่ต้องการ
-        ALERT_NAME = "ผู้ดูแลระบบ"  # เปลี่ยนเป็นชื่อที่ต้องการ
+       
+        ALERT_EMAIL = "it@git.or.th"  
+        ALERT_NAME = "ทีม IT"  
         
-        # สร้าง object แบบ User สำหรับส่งอีเมล
+       
         class AlertRecipient:
             def __init__(self, email, name):
                 self.email = email
@@ -659,203 +662,184 @@ def get_all_users_for_alerts():
         logger.error(f"Error getting users for alerts: {str(e)}")
         return []
 
+def check_and_send_overdue_alerts():
+    """Check for overdue tickets and send email alerts with correct frequency to it@gi.or.th"""
+    try:
+        total_sent = 0
+        current_time = datetime.utcnow()
+        current_date = current_time.date()
+        
+        # Get cache key for tracking sent alerts to prevent spam
+        cache_key = f'overdue_alerts_sent_{current_date.strftime("%Y%m%d")}'
+        sent_today = cache.get(cache_key) or set()
+        
+        # Get all overdue tickets (New/Pending status, exclude information type)
+        overdue_tickets = Ticket.query.filter(
+            and_(
+                Ticket.status.in_(['New', 'Pending']),
+                or_(Ticket.type.is_(None), Ticket.type != 'information')
+            )
+        ).all()
+        
+        for ticket in overdue_tickets:
+            try:
+                days_overdue = (current_time - ticket.created_at).days
+                
+                # Skip if not overdue yet
+                if days_overdue < 1:
+                    continue
+                
+                # Determine alert frequency based on days overdue
+                should_send = False
+                frequency_desc = ''
+                
+                if 1 <= days_overdue < 3:
+                    # ค้าง 1-2 วัน: แจ้งวันละครั้ง
+                    should_send = True
+                    frequency_desc = 'วันละครั้ง'
+                elif 3 <= days_overdue < 5:
+                    # ค้าง 3-4 วัน: แจ้ง 2 วันครั้ง
+                    should_send = (days_overdue % 2 == 1)  # วันที่ 3, 5, 7, 9...
+                    frequency_desc = '2 วันครั้ง'
+                elif days_overdue >= 5:
+                    # ค้าง 5+ วัน: แจ้ง 7 วันครั้ง
+                    should_send = (days_overdue % 7 == 5)  # วันที่ 5, 12, 19, 26...
+                    frequency_desc = '7 วันครั้ง'
+                
+                # Check if already sent today to prevent spam
+                alert_key = f"{ticket.ticket_id}_{days_overdue}"
+                if alert_key in sent_today:
+                    continue
+                
+                if should_send:
+                    # Create email content
+                    subject = f"[Ticket #{ticket.ticket_id}] Ticket ค้าง {days_overdue} วัน - {ticket.name or 'N/A'} ({frequency_desc})"
+                    
+                    body = f'''เรียน ทีม IT,
+
+Ticket ต่อไปนี้ค้างเป็นเวลา {days_overdue} วัน (แจ้งเตือน{frequency_desc}):
+
+📋 รหัสทิกเก็ต: {ticket.ticket_id}
+👤 ชื่อลูกค้า: {ticket.name or 'N/A'}
+📧 อีเมล: {ticket.email or 'N/A'}
+📞 เบอร์โทร: {ticket.phone or 'N/A'}
+🏢 แผนก: {ticket.department or 'N/A'}
+📝 ประเภท: {ticket.type or 'N/A'}
+📅 วันนัดหมาย: {ticket.appointment or 'N/A'}
+🔖 กลุ่ม: {ticket.report or 'N/A'}
+🏷️ กลุ่มย่อย: {getattr(ticket, 'subgroup', None) or 'N/A'}
+📄 รายงาน: {ticket.report or 'N/A'}
+🎯 ความต้องการ: {ticket.requested or 'N/A'}
+📅 วันที่สร้าง: {ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'}
+🔄 สถานะปัจจุบัน: {ticket.status}
+⏰ ค้างมาแล้ว: {days_overdue} วัน
+🔔 ความถี่การแจ้งเตือน: {frequency_desc}
+
+กรุณาดำเนินการตรวจสอบและอัปเดตสถานะ
+
+ขอบคุณครับ'''
+                    
+                    # Send email directly to it@gi.or.th
+                    send_email_alert(
+                        recipient_email=ALERT_RECIPIENT_EMAIL,
+                        recipient_name=ALERT_RECIPIENT_NAME,
+                        subject=subject,
+                        body=body,
+                        alert_type=f'overdue_ticket_{days_overdue}d',
+                        ticket_id=ticket.ticket_id
+                    )
+                    
+                    # Mark as sent to prevent spam
+                    sent_today.add(alert_key)
+                    total_sent += 1
+                    
+                    logger.info(f"Overdue alert sent for ticket: {ticket.ticket_id} ({days_overdue} days, {frequency_desc})")
+                    
+            except Exception as ticket_error:
+                logger.error(f"Error processing overdue ticket {ticket.ticket_id}: {str(ticket_error)}")
+        
+        # Cache sent alerts for today to prevent duplicates
+        cache.set(cache_key, sent_today, timeout=86400)  # 24 hours
+        
+        logger.info(f"Overdue ticket alerts process completed. Total sent: {total_sent} alerts")
+        
+    except Exception as e:
+        logger.error(f"Error checking and sending overdue alerts: {str(e)}")
+
 def send_new_ticket_alerts(ticket):
     """Send email alerts for new tickets"""
     try:
         print(f"📧 DEBUG: Starting email alert for ticket {ticket.ticket_id}")
         
-        # Check if new ticket alerts are enabled
-        setting = AlertSettings.query.filter_by(setting_name='new_ticket_alert_enabled').first()
-        print(f"🔍 DEBUG: Alert setting found: {setting.setting_value if setting else 'None'}")
-        
-        if not setting:
-            print(f"❌ DEBUG: Alert setting not found, creating default setting")
-            # Create default setting
-            setting = AlertSettings(
-                setting_name='new_ticket_alert_enabled',
-                setting_value='true',
-                description='Enable email alerts for new tickets'
-            )
-            db.session.add(setting)
-            db.session.commit()
-            print(f"✅ DEBUG: Default alert setting created and enabled")
-        
-        if setting.setting_value.lower() != 'true':
-            print(f"⚠️ DEBUG: New ticket alerts are disabled")
+        # Skip email alerts for information type tickets
+        if ticket.type and ticket.type.lower() == 'information':
+            print(f"ℹ️ DEBUG: Skipping email alert for information type ticket {ticket.ticket_id}")
             return
         
-        # Get email template
-        template = EmailTemplate.query.filter_by(template_type='new_ticket', is_active=True).first()
-        print(f"📋 DEBUG: Email template found: {template is not None}")
+        # Create email content directly
+        subject = f"[Ticket #{ticket.ticket_id}] ทิกเก็ตใหม่จาก {ticket.name or 'N/A'}"
         
-        if not template:
-            print(f"❌ DEBUG: No email template found, creating default template")
-            # Create default template if not exists
-            template = EmailTemplate(
-                template_type='new_ticket',
-                subject_template='[Ticket #{ticket_id}] ทิกเก็ตใหม่จาก {name}',
-                body_template='''เรียน ผู้ใช้ระบบ,
+        body = f'''เรียน ทีม IT,
 
 มีทิกเก็ตใหม่เข้ามาในระบบ:
 
-📋 รหัสทิกเก็ต: {ticket_id}
-👤 ชื่อลูกค้า: {name}
-📧 อีเมล: {email}
-📞 เบอร์โทร: {phone}
-🏢 แผนก: {department}
-📝 ประเภท: {type}
-📄 รายงาน: {report}
-🎯 ความต้องการ: {requested}
-📅 วันที่สร้าง: {created_at}
+📋 รหัสทิกเก็ต: {ticket.ticket_id}
+👤 ชื่อลูกค้า: {ticket.name or 'N/A'}
+📧 อีเมล: {ticket.email or 'N/A'}
+📞 เบอร์โทร: {ticket.phone or 'N/A'}
+🏢 แผนก: {ticket.department or 'N/A'}
+📝 ประเภท: {ticket.type or 'N/A'}
+📅 วันนัดหมาย: {ticket.appointment or 'N/A'}
+🔖 กลุ่ม: {ticket.report or 'N/A'}
+🏷️ กลุ่มย่อย: {getattr(ticket, 'subgroup', None) or 'N/A'}
+📄 รายงาน: {ticket.report or 'N/A'}
+🎯 ความต้องการ: {ticket.requested or 'N/A'}
+📅 วันที่สร้าง: {ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'}
 
 กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อไป
 
-ขอบคุณครับ''',
-                is_active=True
+ขอบคุณครับ'''
+        
+        # Send email directly to it@gi.or.th
+        print(f"📨 DEBUG: Sending email to {ALERT_RECIPIENT_EMAIL} ({ALERT_RECIPIENT_NAME})")
+        try:
+            result = send_email_alert(
+                recipient_email=ALERT_RECIPIENT_EMAIL,
+                recipient_name=ALERT_RECIPIENT_NAME,
+                subject=subject,
+                body=body,
+                alert_type='new_ticket',
+                ticket_id=ticket.ticket_id
             )
-            db.session.add(template)
-            db.session.commit()
-            print(f"✅ DEBUG: Default email template created")
-        
-        # Get all users to notify
-        all_users = get_all_users_for_alerts()
-        print(f"👥 DEBUG: Found {len(all_users)} users for alerts")
-        
-        if not all_users:
-            print(f"❌ DEBUG: No users found for email alerts")
-            return
-        
-        # Prepare email content
-        subject = template.subject_template.format(
-            ticket_id=ticket.ticket_id,
-            name=ticket.name or 'N/A',
-            department=ticket.department or 'N/A'
-        )
-        
-        body = template.body_template.format(
-            ticket_id=ticket.ticket_id,
-            name=ticket.name or 'N/A',
-            email=ticket.email or 'N/A',
-            phone=ticket.phone or 'N/A',
-            department=ticket.department or 'N/A',
-            type=ticket.type or 'N/A',
-            report=ticket.report or 'N/A',
-            requested=ticket.requested or 'N/A',
-            created_at=ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'
-        )
-        
-        # Send alerts to all users
-        for user in all_users:
-            print(f"📨 DEBUG: Sending email to {user.email} ({user.name})")
-            try:
-                result = send_email_alert(
-                    recipient_email=user.email,
-                    recipient_name=user.name,
-                    subject=subject,
-                    body=body,
-                    alert_type='new_ticket',
-                    ticket_id=ticket.ticket_id
-                )
-                print(f"✅ DEBUG: Email sent successfully to {user.email}")
-            except Exception as send_error:
-                print(f"❌ DEBUG: Failed to send email to {user.email}: {str(send_error)}")
+            print(f"✅ DEBUG: New ticket email sent successfully to {ALERT_RECIPIENT_EMAIL}")
+        except Exception as send_error:
+            print(f"❌ DEBUG: Failed to send new ticket email: {str(send_error)}")
         
         print(f"🎉 DEBUG: New ticket alerts process completed for ticket {ticket.ticket_id}")
         
     except Exception as e:
         logger.error(f"Error sending new ticket alerts: {str(e)}")
 
-def check_and_send_overdue_alerts():
-    """Check for overdue tickets and send email alerts"""
-    try:
-        # Check if overdue alerts are enabled
-        setting = AlertSettings.query.filter_by(setting_name='overdue_alert_enabled').first()
-        if not setting or setting.setting_value.lower() != 'true':
-            return
-        
-        # Get overdue threshold in days
-        threshold_setting = AlertSettings.query.filter_by(setting_name='overdue_days_threshold').first()
-        overdue_days = int(threshold_setting.setting_value) if threshold_setting else 3
-        
-        # Calculate cutoff date
-        cutoff_date = datetime.utcnow() - timedelta(days=overdue_days)
-        
-        # Find overdue tickets (status 'New' or 'Pending' and older than 3 days)
-        overdue_tickets = Ticket.query.filter(
-            and_(
-                Ticket.created_at < cutoff_date,
-                Ticket.status.in_(['New', 'Pending'])
-            )
-        ).all()
-        
-        if not overdue_tickets:
-            logger.info("No overdue tickets found")
-            return
-        
-        # Get email template
-        template = EmailTemplate.query.filter_by(template_type='overdue_ticket', is_active=True).first()
-        if not template:
-            logger.warning("No active email template found for overdue_ticket")
-            return
-        
-        # Get all users to notify
-        all_users = get_all_users_for_alerts()
-        if not all_users:
-            logger.warning("No users found for email alerts")
-            return
-        
-        # Group tickets and send summary email
-        ticket_list = "\n".join([
-            f"- {ticket.ticket_id}: {ticket.name} ({ticket.department}) - {ticket.status} - Created: {ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'}"
-            for ticket in overdue_tickets
-        ])
-        
-        subject = template.subject_template.format(
-            count=len(overdue_tickets),
-            days=overdue_days
-        )
-        
-        body = template.body_template.format(
-            count=len(overdue_tickets),
-            days=overdue_days,
-            ticket_list=ticket_list,
-            current_date=datetime.now().strftime('%d/%m/%Y %H:%M')
-        )
-        
-        # Send alerts to all users
-        for user in all_users:
-            send_email_alert(
-                recipient_email=user.email,
-                recipient_name=user.name,
-                subject=subject,
-                body=body,
-                alert_type='overdue_ticket'
-            )
-        
-        logger.info(f"Overdue ticket alerts sent for {len(overdue_tickets)} tickets")
-        
-    except Exception as e:
         logger.error(f"Error checking and sending overdue alerts: {str(e)}")
-
 def check_and_alert_new_tickets(tickets):
     """Check for new tickets and send email alerts"""
     try:
-        # ใช้ cache เพื่อเก็บ ticket IDs ที่เคยส่งแจ้งเตือนแล้ว
+        
         cache_key = 'alerted_ticket_ids'
         alerted_ticket_ids = cache.get(cache_key) or set()
         
         new_tickets_found = []
         
-        # ตรวจสอบทิกเก็ตใหม่ (ที่ยังไม่เคยส่งแจ้งเตือน)
+    
         for ticket in tickets:
             if ticket.ticket_id not in alerted_ticket_ids:
                 new_tickets_found.append(ticket)
                 alerted_ticket_ids.add(ticket.ticket_id)
         
-        # อัพเดท cache ด้วย ticket IDs ใหม่
+     
         cache.set(cache_key, alerted_ticket_ids, timeout=86400)  # เก็บไว้ 24 ชั่วโมง
         
-        # ส่งอีเมลแจ้งเตือนสำหรับทิกเก็ตใหม่
+       
         if new_tickets_found:
             print(f"🔔 Found {len(new_tickets_found)} new tickets, sending email alerts...")
             
@@ -906,10 +890,10 @@ def test_overdue_alerts():
         if not current_user or current_user.role != 'admin':
             return jsonify({'error': 'Admin access required'}), 403
         
-        # รันการตรวจสอบทิกเก็ตค้าง
+        
         check_and_send_overdue_alerts()
         
-        # นับจำนวนทิกเก็ตค้าง
+      
         cutoff_date = datetime.utcnow() - timedelta(days=3)
         overdue_count = Ticket.query.filter(
             and_(
@@ -948,58 +932,86 @@ def has_permission(user, permission_name):
         return False
 
 def send_textbox_message(user_id, message_text):
-    url = "https://api.line.me/v2/bot/message/push"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
-    }
+    """Send message to LINE user with error handling"""
+    try:
+        if not LINE_ACCESS_TOKEN:
+            print("❌ LINE_ACCESS_TOKEN not configured")
+            return False
+            
+        if not user_id:
+            print("❌ user_id is empty")
+            return False
+            
+        print(f"📤 Attempting to send LINE message to user_id: {user_id}")
+        
+        url = "https://api.line.me/v2/bot/message/push"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
+        }
 
-    # สร้าง Flex Message สำหรับ textbox reply
-    payload = {
-        "to": user_id,
-        "messages": [
-            {
-                "type": "flex",
-                "altText": "ข้อความจากเจ้าหน้าที่",
-                "contents": {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "💼 ตอบกลับจากเจ้าหน้าที่",
-                                "weight": "bold",
-                                "size": "lg",
-                                "color": "#005BBB"
-                            },
-                            {
-                                "type": "text",
-                                "text": message_text,
-                                "wrap": True,
-                                "margin": "md"
-                            },
-                            {
-                                "type": "text",
-                                "text": "พิมพ์ 'จบ' เพื่อสิ้นสุดการสนทนา",
-                                "size": "sm",
-                                "color": "#AAAAAA",
-                                "margin": "md"
-                            }
-                        ]
+        # สร้าง Flex Message สำหรับ textbox reply
+        payload = {
+            "to": user_id,
+            "messages": [
+                {
+                    "type": "flex",
+                    "altText": "ข้อความจากเจ้าหน้าที่",
+                    "contents": {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "💼 ตอบกลับจากเจ้าหน้าที่",
+                                    "weight": "bold",
+                                    "size": "lg",
+                                    "color": "#005BBB"
+                                },
+                                {
+                                    "type": "text",
+                                    "text": message_text,
+                                    "wrap": True,
+                                    "margin": "md"
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "พิมพ์ 'จบ' เพื่อสิ้นสุดการสนทนา",
+                                    "size": "sm",
+                                    "color": "#AAAAAA",
+                                    "margin": "md"
+                                }
+                            ]
+                        }
                     }
                 }
-            }
-        ]
-    }
+            ]
+        }
 
-    # ส่งข้อความไปยัง LINE Messaging API
-    response = requests.post(url, headers=headers, json=payload)
-    return response.status_code == 200
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        print(f"📱 LINE API response: {response.status_code} - {response.text[:200]}")
+        
+        if response.status_code == 200:
+            print(f"✅ LINE message sent successfully to {user_id}")
+            return True
+        else:
+            print(f"❌ LINE API error {response.status_code}: {response.text}")
+            return False
+            
+    except requests.exceptions.Timeout:
+        print(f"⏰ LINE API timeout for user_id: {user_id}")
+        return False
+    except requests.exceptions.RequestException as e:
+        print(f"❌ LINE API request error for {user_id}: {str(e)}")
+        return False
+    except Exception as e:
+        print(f"⚠️ Unexpected error in send_textbox_message: {str(e)}")
+        return False
 
 def notify_user(payload):
-    # ตรวจสอบและกำหนดค่าเริ่มต้นสำหรับฟิลด์ที่อาจเป็น None
+    
     payload['report'] = payload.get('report') if payload.get('report') is not None else 'ไม่มีข้อมูล'
     payload['requested'] = payload.get('requested') if payload.get('requested') is not None else 'ไม่มีข้อมูล'
     payload['textbox'] = payload.get('textbox') if payload.get('textbox') is not None else 'ไม่มีข้อมูล'
@@ -1031,13 +1043,13 @@ def create_flex_message(payload):
             appointment_date = payload['appointment']
     status = payload.get('status', 'ไม่ระบุ')
     status_color = {
-        'New': '#00BFFF',           # ฟ้าอ่อน
-        'In Progress': '#0066FF',   # ฟ้าเข้ม
-        'Pending': '#FF9900',       # ส้ม
-        'Closed': '#00AA00',        # เขียว
-        'Cancelled': '#666666',     # เทาเข้ม
-        'On Hold': '#A020F0',       # ม่วง
-        'Rejected': '#FF0000',      # แดง (ถ้ามี)
+        'New': '#00BFFF',           
+        'In Progress': '#0066FF',   
+        'Pending': '#FF9900',       
+        'Closed': '#00AA00',        
+        'Cancelled': '#666666',     
+        'On Hold': '#A020F0',      
+        'Rejected': '#FF0000',     
     }.get(status, '#666666')
     print(f"[create_flex_message] payload type: {payload.get('type')}")
     ticket_type = (payload.get('type') or '').upper()
@@ -1668,6 +1680,49 @@ def get_user_activity_logs():
         print(f"Activity logs error: {str(e)}")
         return jsonify({'error': 'Failed to fetch activity logs', 'details': str(e)}), 500
 
+# Add simplified activity-log endpoint for frontend compatibility
+@app.route('/api/activity-log', methods=['POST'])
+@jwt_required()
+def log_activity():
+    """Log user activity - simplified endpoint for frontend"""
+    try:
+        current_user_data = get_jwt_identity()
+        current_user = User.query.get(current_user_data['user_id'])
+        
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        action_type = data.get('action_type', 'unknown')
+        description = data.get('description', '')
+        ticket_id = data.get('ticket_id')
+        
+        # Create activity log entry
+        activity_log = UserActivityLog(
+            user_id=current_user.id,
+            action_type=action_type,
+            description=description,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', ''),
+            metadata={'ticket_id': ticket_id} if ticket_id else None
+        )
+        
+        db.session.add(activity_log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Activity logged successfully'
+        }), 200
+        
+    except Exception as e:
+        print(f"Activity log error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to log activity', 'details': str(e)}), 500
+
 @app.route('/api/admin/users', methods=['GET'])
 @jwt_required()
 def get_all_users():
@@ -1713,15 +1768,15 @@ def toggle_user_status(user_id):
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
         
-        # Don't allow deactivating self
+       
         if target_user.id == current_user.id:
             return jsonify({'error': 'Cannot deactivate your own account'}), 400
         
-        # Toggle status
+      
         target_user.is_active = not target_user.is_active
         db.session.commit()
         
-        # Log the action
+    
         ip_address, user_agent = get_client_info(request)
         log_user_activity(
             user_id=current_user.id,
@@ -1759,16 +1814,16 @@ def protected():
         print(f"JWT validation error: {str(e)}")
         return jsonify({"error": "Invalid token"}), 422
 
-# เพิ่ม route สำหรับตรวจสอบสถานะการล็อกอิน
+
 @app.route('/api/auth/status', methods=['GET'])
 def auth_status():
     try:
-        # ตรวจสอบว่ามี Authorization header หรือไม่
+     
         auth_header = request.headers.get('Authorization')
         if not auth_header:
             return jsonify({"authenticated": False, "message": "No token provided"}), 401
         
-        # ลบ "Bearer " ออกจาก token
+        
         if not auth_header.startswith('Bearer '):
             return jsonify({"authenticated": False, "message": "Invalid token format"}), 401
         
@@ -1793,13 +1848,13 @@ def auth_status():
 @cache.cached(timeout=60, query_string=True) 
 def get_data():
     try:
-        # Use SQLAlchemy to query tickets
+       
         tickets = Ticket.query.order_by(Ticket.created_at.desc()).limit(1000).all()
         
-        # ตรวจสอบทิกเก็ตใหม่และส่งอีเมลแจ้งเตือน
+        
         check_and_alert_new_tickets(tickets)
         
-        # ตรวจสอบทิกเก็ตค้าง 3 วัน (สถานะ New/Pending)
+    
         check_and_send_overdue_alerts()
         
         result = [
@@ -1815,8 +1870,7 @@ def get_data():
                 "Requested": ticket.requested,
                 "Report": ticket.report,
                 "Type": ticket.type,
-                # Determine effective group from requested/report, ignore literal "None"
-                # compute effective group and expose in common key variants
+              
                 **(lambda eg: {"Group": eg, "group": eg, "GROUP": eg})(
                     ticket.requested if (ticket.requested and str(ticket.requested).lower() != "none") else (
                         ticket.report if (ticket.report and str(ticket.report).lower() != "none") else None
@@ -1836,7 +1890,7 @@ def get_data():
             "message": str(e)
         }), 500
 
-# ---------- Type-Group-Subgroup endpoints ----------
+
 TYPE_GROUP_FILE = 'type_group.json'
 
 def _load_tgs() -> dict:
@@ -1869,21 +1923,21 @@ def save_type_group_subgroup():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ---------- Ticket create & update endpoints ----------
+
 
 @app.route('/create-ticket', methods=['GET', 'POST'])
 @jwt_required()
 def create_ticket():
     """Create a new ticket with user activity logging"""
     try:
-        # Get current user and session
+      
         current_user_data = get_jwt_identity()
         current_user = User.query.get(current_user_data['user_id'])
         
         if not current_user:
             return jsonify({'error': 'User not found'}), 404
         
-        # Check PIN verification
+      
         session = get_session_from_token()
         if not session or not session.pin_verified:
             return jsonify({'error': 'PIN verification required'}), 403
@@ -1896,7 +1950,7 @@ def create_ticket():
         if Ticket.query.get(ticket_id):
             return jsonify({"error": "Ticket ID already exists"}), 400
 
-        # Create new ticket
+      
         new_ticket = Ticket()
         new_ticket.ticket_id  = ticket_id
         new_ticket.user_id    = str(current_user.id)  # Link ticket to user
@@ -1916,7 +1970,7 @@ def create_ticket():
         db.session.add(new_ticket)
         db.session.commit()
         
-        # Log ticket creation activity
+     
         ip_address, user_agent = get_client_info(request)
         log_user_activity(
             user_id=current_user.id,
@@ -1936,7 +1990,7 @@ def create_ticket():
             user_agent=user_agent
         )
         
-        # Send email alerts for new ticket
+        
         print(f"🔔 DEBUG: Attempting to send email alerts for ticket {ticket_id}")
         try:
             send_new_ticket_alerts(new_ticket)
@@ -2170,8 +2224,23 @@ def delete_ticket():
     try:
         # 1) ลบ TicketStatusLog และ Message ที่อ้างถึง ticket_id นี้ก่อน แล้ว commit แยก
         try:
-            TicketStatusLog.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
-            Message.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
+            print(f"🗑️ DEBUG: Deleting data for ticket_id: {ticket_id}")
+            
+            # Delete status logs
+            logs_deleted = TicketStatusLog.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
+            print(f"📄 DEBUG: Deleted {logs_deleted} status logs")
+            
+            # Delete messages using ticket_id field
+            messages_deleted = Message.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
+            print(f"💬 DEBUG: Deleted {messages_deleted} messages")
+            
+            # Delete email alerts related to this ticket
+            try:
+                alerts_deleted = EmailAlert.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
+                print(f"📧 DEBUG: Deleted {alerts_deleted} email alerts")
+            except Exception as alert_err:
+                print(f"⚠️ WARNING: Could not delete email alerts: {alert_err}")
+            
             db.session.commit()  # commit ทันทีเพื่อให้ DB ลบ record เหล่านั้นจริง ๆ
         except Exception as msg_err:
             db.session.rollback()
@@ -2933,11 +3002,249 @@ def get_data_by_date_range():
         if 'conn' in locals():
             conn.close()
 
+# Process textbox messages from tickets into messages table
+@app.route('/api/process-textbox-messages', methods=['POST', 'OPTIONS'])
+def process_textbox_messages():
+    """ย้ายข้อความจาก textbox ในตาราง tickets ไปใส่ในตาราง messages แล้วลบ textbox"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        ticket_id = data.get('ticket_id')
+        if not ticket_id:
+            return jsonify({"error": "ticket_id is required"}), 400
+        
+        print(f"📦 ย้าย textbox ไป messages สำหรับ ticket: {ticket_id}")
+        
+        # หา ticket ที่มี textbox และ type = "information"
+        ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
+        if not ticket:
+            return jsonify({"error": "ไม่พบ ticket"}), 404
+        
+        # ตรวจสอบว่า ticket มี type = "information" หรือไม่
+        if ticket.type != "information":
+            return jsonify({
+                "message": f"ข้าม ticket นี้เพราะ type = '{ticket.type}' (รองรับเฉพาะ type = 'information')", 
+                "processed": 0,
+                "ticket_type": ticket.type
+            })
+        
+        if not ticket.textbox or ticket.textbox.strip() == '':
+            return jsonify({"message": "ไม่มี textbox ที่จะย้าย", "processed": 0})
+        
+        textbox_content = ticket.textbox.strip()
+        print(f"📝 เนื้อหา textbox: {textbox_content[:100]}...")
+        
+        # สร้าง message ใหม่จาก textbox
+        new_message = Message(
+            ticket_id=ticket_id,
+            user_id=ticket_id,  # ใช้ ticket_id เป็น user_id สำหรับข้อความจาก LINE
+            admin_id=None,
+            sender_type="user",
+            message=textbox_content,
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(new_message)
+        print(f"✅ สร้าง message ใหม่แล้ว")
+        
+        # สร้าง notification
+        user_name = ticket.name if ticket.name else f"User {ticket_id[:8]}..."
+        notification = Notification(
+            message=f"ข้อความใหม่จาก {user_name}: {textbox_content[:50]}...",
+            sender_name=user_name,
+            user_id=ticket_id,
+            meta_data={
+                "type": "textbox_message",
+                "ticket_id": ticket_id,
+                "user_name": user_name
+            }
+        )
+        db.session.add(notification)
+        print(f"✅ สร้าง notification แล้ว")
+        
+        # ลบ textbox หลังจากย้ายแล้ว
+        ticket.textbox = None
+        print(f"🗑️ ลบ textbox ออกจาก ticket แล้ว")
+        
+        db.session.commit()
+        
+        print(f"✅ ย้าย textbox ไป messages สำเร็จ สำหรับ ticket {ticket_id}")
+        return jsonify({
+            "success": True,
+            "message": "ย้าย textbox ไป messages สำเร็จแล้ว",
+            "processed": 1,
+            "ticket_id": ticket_id,
+            "moved_content": textbox_content[:100] + "..." if len(textbox_content) > 100 else textbox_content
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ ข้อผิดพลาดในการย้าย textbox: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/process-all-textbox-messages', methods=['POST', 'OPTIONS'])
+def process_all_textbox_messages():
+    """ย้ายข้อความจาก textbox ในตาราง tickets ทั้งหมดไปใส่ในตาราง messages แล้วลบ textbox"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    try:
+        print(f"📦 เริ่มย้าย textbox ทั้งหมดไป messages...")
+        
+        # หา tickets ทั้งหมดที่มี textbox ไม่ว่าง และ type = "information"
+        tickets_with_textbox = Ticket.query.filter(
+            Ticket.textbox.isnot(None),
+            Ticket.textbox != '',
+            Ticket.type == 'information'
+        ).all()
+        
+        if not tickets_with_textbox:
+            print(f"ℹ️ ไม่พบ tickets ที่มี textbox")
+            return jsonify({
+                "success": True,
+                "message": "ไม่พบ tickets ที่มี textbox ที่จะย้าย",
+                "processed": 0,
+                "ticket_ids": []
+            })
+        
+        print(f"🔍 พบ {len(tickets_with_textbox)} tickets ที่มี textbox")
+        
+        processed_count = 0
+        processed_tickets = []
+        failed_tickets = []
+        
+        for ticket in tickets_with_textbox:
+            try:
+                if ticket.textbox and ticket.textbox.strip():
+                    textbox_content = ticket.textbox.strip()
+                    print(f"📝 กำลังย้าย textbox จาก ticket {ticket.ticket_id}: {textbox_content[:50]}...")
+                    
+                    # สร้าง message ใหม่จาก textbox
+                    new_message = Message(
+                        ticket_id=ticket.ticket_id,
+                        user_id=ticket.ticket_id,  # ใช้ ticket_id เป็น user_id
+                        admin_id=None,
+                        sender_type="user",
+                        message=textbox_content,
+                        timestamp=datetime.utcnow()
+                    )
+                    db.session.add(new_message)
+                    
+                    # สร้าง notification
+                    user_name = ticket.name if ticket.name else f"User {ticket.ticket_id[:8]}..."
+                    notification = Notification(
+                        message=f"ข้อความใหม่จาก {user_name}: {textbox_content[:50]}...",
+                        sender_name=user_name,
+                        user_id=ticket.ticket_id,
+                        meta_data={
+                            "type": "textbox_message",
+                            "ticket_id": ticket.ticket_id,
+                            "user_name": user_name
+                        }
+                    )
+                    db.session.add(notification)
+                    
+                    # ลบ textbox หลังจากย้ายแล้ว
+                    ticket.textbox = None
+                    
+                    processed_count += 1
+                    processed_tickets.append(ticket.ticket_id)
+                    
+                    print(f"✅ ย้าย textbox สำเร็จสำหรับ ticket {ticket.ticket_id}")
+            except Exception as ticket_error:
+                print(f"❌ ข้อผิดพลาดในการย้าย ticket {ticket.ticket_id}: {str(ticket_error)}")
+                failed_tickets.append(ticket.ticket_id)
+                continue
+        
+        db.session.commit()
+        
+        result_message = f"ย้าย textbox ไป messages สำเร็จ {processed_count} tickets"
+        if failed_tickets:
+            result_message += f", ล้มเหลว {len(failed_tickets)} tickets"
+        
+        print(f"✅ {result_message}")
+        return jsonify({
+            "success": True,
+            "message": result_message,
+            "processed": processed_count,
+            "failed": len(failed_tickets),
+            "ticket_ids": processed_tickets,
+            "failed_ticket_ids": failed_tickets
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error processing all textbox messages: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# Test endpoint to verify server is working
+@app.route('/api/test-messages', methods=['GET', 'POST'])
+def test_messages():
+    print(f"🧪 DEBUG: /api/test-messages called with method {request.method}")
+    if request.method == 'POST':
+        data = request.get_json()
+        print(f"📝 DEBUG: POST data received: {data}")
+        return jsonify({"success": True, "message": "Test endpoint working", "received_data": data})
+    else:
+        return jsonify({"success": True, "message": "Test endpoint working - GET"})
+
 @app.route('/api/messages', methods=['GET'])
 def get_messages():
     user_id = request.args.get('user_id')
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
+    
+    print(f"📨 Getting messages for user_id: {user_id}")
+    
+    # Auto-process textbox messages for this user_id before returning messages
+    try:
+        ticket = Ticket.query.filter_by(ticket_id=user_id).first()
+        if ticket and ticket.textbox and ticket.textbox.strip():
+            print(f"📦 Auto-processing textbox for ticket {user_id}: {ticket.textbox[:50]}...")
+            
+            # Create message from textbox content
+            new_message = Message(
+                ticket_id=user_id,
+                user_id=user_id,
+                admin_id=None,
+                sender_type="user",
+                message=ticket.textbox.strip(),
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(new_message)
+            
+            # Create notification
+            user_name = ticket.name if ticket.name else f"User {user_id[:8]}..."
+            notification = Notification(
+                message=f"ข้อความใหม่จาก {user_name}: {ticket.textbox[:50]}...",
+                sender_name=user_name,
+                user_id=user_id,
+                meta_data={
+                    "type": "textbox_message",
+                    "ticket_id": user_id,
+                    "user_name": user_name
+                }
+            )
+            db.session.add(notification)
+            
+            # Clear textbox after processing
+            ticket.textbox = None
+            db.session.commit()
+            
+            print(f"✅ Auto-processed textbox message for ticket {user_id}")
+    except Exception as e:
+        print(f"⚠️ Error auto-processing textbox: {str(e)}")
+        db.session.rollback()
+    
+    # Get all messages for this user
     messages = Message.query.filter_by(user_id=user_id).order_by(Message.timestamp.asc()).all()
     result = [
         {
@@ -2950,62 +3257,110 @@ def get_messages():
         }
         for m in messages
     ]
+    
+    print(f"📋 Returning {len(result)} messages for user {user_id}")
     return jsonify(result)
 
 @app.route('/api/messages', methods=['POST'])
 def send_message():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-    user_id = data.get('user_id')
-    admin_id = data.get('admin_id')
-    sender_type = data.get('sender_type')
-    message = data.get('message')
-    if not user_id or not message:
-        return jsonify({"error": "user_id and message are required"}), 400
-    # validation sender_type
-    if not sender_type:
-        # ถ้า admin_id มีค่า ให้ default เป็น 'admin' ถ้าไม่มีก็ 'user'
-        if admin_id:
-            sender_type = 'admin'
+    print(f"📨 DEBUG: /api/messages POST request received from {request.remote_addr}")
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        print(f"💬 DEBUG: Received message data: {data}")
+        
+        user_id = data.get('user_id')
+        admin_id = data.get('admin_id')
+        sender_type = data.get('sender_type')
+        message = data.get('message')
+        
+        print(f"🔍 DEBUG: user_id={user_id}, sender_type={sender_type}, message_length={len(message) if message else 0}")
+        
+        if not user_id or not message:
+            return jsonify({"error": "user_id and message are required"}), 400
+        
+        # Set default sender_type (ensure it's never None)
+        if not sender_type or sender_type.strip() == '':
+            sender_type = 'admin' if admin_id else 'user'
+        
+        # Ensure sender_type is valid
+        if sender_type not in ['user', 'admin']:
+            sender_type = 'user'  # Default fallback
+        
+        print(f"💬 DEBUG: Final sender_type={sender_type}")
+        
+        # Check if ticket exists BEFORE creating message
+        ticket = Ticket.query.filter_by(ticket_id=user_id).first()
+        print(f"🎫 DEBUG: Ticket found: {ticket is not None}")
+        
+        # Set user_name for display purposes
+        if not ticket:
+            print(f"⚠️ ไม่พบ ticket {user_id} - อนุญาตให้ส่งข้อความได้แต่ไม่สร้าง dummy ticket")
+            user_name = f"User {user_id[:8]}..."
         else:
-            sender_type = 'user'
-    if sender_type not in ['user', 'admin']:
-        return jsonify({"error": "sender_type must be 'user' or 'admin'"}), 400
-    msg = Message()
-    msg.user_id = user_id
-    msg.admin_id = admin_id
-    msg.sender_type = sender_type
-    msg.message = message
-    msg.timestamp = datetime.utcnow()
-    db.session.add(msg)
-    # --- เพิ่ม Notification ทุกครั้งที่มีข้อความใหม่ ---
-    # ดึงชื่อผู้ใช้จาก ticket
-    ticket = Ticket.query.filter_by(ticket_id=user_id).first()
-    user_name = ticket.name if ticket else user_id
-    notif_msg = f"New message from {'admin' if sender_type == 'admin' else 'user'} to user {user_id}: {message}"
-    add_notification_to_db(
-        message=notif_msg,
-        sender_name=user_name,
-        user_id=user_id,
-        meta_data={
-            "type": "new_message",
-            "user_id": user_id,
-            "sender_name": user_name
-        }
-    )
-    db.session.commit()
-    if sender_type == 'admin':
-        send_textbox_message(user_id, message)
-    return jsonify({
-        "id": msg.id,
-        "user_id": msg.user_id,
-        "admin_id": msg.admin_id,
-        "sender_type": msg.sender_type,
-        "message": msg.message,
-        "timestamp": msg.timestamp.isoformat(),
-        "success": True
-    })
+            user_name = ticket.name if ticket.name else "Unknown User"
+        
+        # Create message
+        msg = Message(
+            ticket_id=user_id if ticket else None,  # Only set ticket_id if ticket exists
+            user_id=user_id,     # Keep for compatibility
+            admin_id=admin_id,
+            sender_type=sender_type,
+            message=message
+        )
+        db.session.add(msg)
+        
+        # สร้าง notification เฉพาะเมื่อ user ส่งข้อความ และมี ticket ที่ถูกต้อง
+        if sender_type == 'user' and ticket:
+            notif_msg = f"ข้อความใหม่จาก {user_name}: {message[:50]}{'...' if len(message) > 50 else ''}"
+            add_notification_to_db(
+                message=notif_msg,
+                sender_name=user_name,
+                user_id=user_id,
+                meta_data={
+                    "type": "new_message",
+                    "user_id": user_id,
+                    "sender_name": user_name
+                }
+            )
+            print(f"📢 สร้าง notification สำหรับข้อความจาก user: {user_name}")
+        elif sender_type == 'admin':
+            print(f"🔇 ไม่สร้าง notification สำหรับข้อความจาก admin")
+        else:
+            print(f"🔇 ไม่สร้าง notification เพราะไม่มี ticket ที่ถูกต้อง")
+        
+        db.session.commit()
+        
+      
+        if sender_type == 'admin':
+            try:
+                line_success = send_textbox_message(user_id, message)
+                if line_success:
+                    print(f"✅ LINE message sent successfully to {user_id}")
+                else:
+                    print(f"❌ Failed to send LINE message to {user_id}")
+            except Exception as line_error:
+                print(f"⚠️ LINE message error for {user_id}: {str(line_error)}")
+        
+        return jsonify({
+            "id": msg.id,
+            "user_id": msg.user_id,
+            "admin_id": msg.admin_id,
+            "sender_type": msg.sender_type,
+            "message": msg.message,
+            "timestamp": msg.timestamp.isoformat(),
+            "success": True
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ ERROR in send_message: {str(e)}")
+        print(f"🔍 Full traceback: {error_details}")
+        return jsonify({"error": str(e), "details": error_details}), 500
 
 @app.route('/api/status')
 def system_status():
@@ -4026,11 +4381,11 @@ def manage_user_by_id(user_id):
             if not data:
                 return jsonify({'error': 'Missing JSON data'}), 400
             
-            # Update fields
+            
             if 'name' in data:
                 target_user.name = data['name']
             if 'email' in data:
-                # Check if email already exists for another user
+               
                 existing = User.query.filter(User.email == data['email'], User.id != user_id).first()
                 if existing:
                     return jsonify({'error': 'Email already exists'}), 409
@@ -4295,14 +4650,14 @@ def get_simple_email_alerts():
         date_from = request.args.get('dateFrom', '')
         date_to = request.args.get('dateTo', '')
         
-        # ใช้ raw SQL query แทน SQLAlchemy
+       
         conn = psycopg2.connect(
             dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
             host=DB_HOST, port=DB_PORT
         )
         cur = conn.cursor()
         
-        # สร้างตาราง email_alerts ถ้ายังไม่มี
+        
         cur.execute('''
             CREATE TABLE IF NOT EXISTS email_alerts (
                 id SERIAL PRIMARY KEY,
@@ -4415,7 +4770,72 @@ def test_email():
         logger.error(f"Error sending test email: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# Duplicate endpoint removed - using the one defined earlier
+# Delete ticket endpoint
+@app.route('/delete-ticket', methods=['POST'])
+def delete_ticket_endpoint():
+    """Delete a ticket and all related data"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        ticket_id = data.get('ticket_id')
+        if not ticket_id:
+            return jsonify({"error": "ticket_id is required"}), 400
+        
+        # Delete related data and ticket
+        try:
+            print(f"🗑️ DEBUG: Deleting data for ticket_id: {ticket_id}")
+            
+            # Delete messages related to this ticket using ticket_id field
+            messages_deleted = db.session.query(Message).filter(Message.ticket_id == ticket_id).delete()
+            print(f"💬 DEBUG: Deleted {messages_deleted} messages")
+            
+            # Delete status logs related to this ticket
+            logs_deleted = db.session.query(TicketStatusLog).filter(TicketStatusLog.ticket_id == ticket_id).delete()
+            print(f"📄 DEBUG: Deleted {logs_deleted} status logs")
+            
+            # Delete the ticket itself
+            ticket = Ticket.query.get(ticket_id)
+            if ticket:
+                db.session.delete(ticket)
+            
+            # Create notification about deletion (without auto-commit)
+            notif = Notification(
+                message=f"Ticket {ticket_id} has been deleted",
+                timestamp=datetime.utcnow(),
+                read=False,
+                sender_name="system",
+                user_id=ticket_id,
+                meta_data={
+                    "type": "ticket_deleted",
+                    "ticket_id": ticket_id
+                }
+            )
+            db.session.add(notif)
+            
+            db.session.commit()
+            
+            return jsonify({
+                "success": True,
+                "message": "Ticket deleted successfully"
+            })
+            
+        except Exception as delete_error:
+            db.session.rollback()
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"❌ ERROR deleting ticket data: {str(delete_error)}")
+            print(f"🔍 Delete traceback: {error_details}")
+            return jsonify({"error": f"Failed to delete ticket: {str(delete_error)}", "details": error_details}), 500
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ ERROR in delete_ticket_endpoint: {str(e)}")
+        print(f"🔍 Full delete traceback: {error_details}")
+        return jsonify({"error": str(e), "details": error_details}), 500
 
 def setup_scheduler():
     """Setup background scheduler for overdue alerts"""
@@ -4441,14 +4861,123 @@ def setup_scheduler():
     except Exception as e:
         logger.error(f"Error setting up scheduler: {str(e)}")
 
+@app.route('/api/test-email', methods=['POST'])
+@jwt_required(optional=True)
+def test_email_sending():
+    """Test email sending functionality"""
+    try:
+        data = request.get_json() or {}
+        recipient_email = data.get('email', 'webmaster@git.or.th')
+        subject = data.get('subject', 'Test Email from Ticket Management System')
+        body = data.get('body', 'This is a test email to verify Office 365 SMTP configuration is working correctly.')
+        
+        # Test SMTP configuration
+        smtp_config = {
+            'server': app.config.get('MAIL_SERVER'),
+            'port': app.config.get('MAIL_PORT'),
+            'username': app.config.get('MAIL_USERNAME'),
+            'sender': app.config.get('MAIL_DEFAULT_SENDER'),
+            'use_tls': app.config.get('MAIL_USE_TLS'),
+            'use_ssl': app.config.get('MAIL_USE_SSL')
+        }
+        
+        # Send test email
+        success = send_email_alert(
+            recipient_email=recipient_email,
+            recipient_name='Test Recipient',
+            subject=subject,
+            body=body,
+            alert_type='test'
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Test email sent successfully to {recipient_email}',
+                'smtp_config': smtp_config
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to send test email',
+                'smtp_config': smtp_config
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Email test error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'Email test failed'
+        }), 500
+
+@app.route('/api/email-config', methods=['GET'])
+@jwt_required(optional=True)
+def get_email_config():
+    """Get current email configuration (without sensitive data)"""
+    try:
+        config = {
+            'mail_server': app.config.get('MAIL_SERVER'),
+            'mail_port': app.config.get('MAIL_PORT'),
+            'mail_use_tls': app.config.get('MAIL_USE_TLS'),
+            'mail_use_ssl': app.config.get('MAIL_USE_SSL'),
+            'mail_username': app.config.get('MAIL_USERNAME'),
+            'mail_default_sender': app.config.get('MAIL_DEFAULT_SENDER'),
+            'password_configured': bool(app.config.get('MAIL_PASSWORD'))
+        }
+        
+        return jsonify({
+            'success': True,
+            'config': config
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+def migrate_messages_table():
+    """Make ticket_id nullable in messages table"""
+    try:
+        conn = psycopg2.connect(
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, 
+            host=DB_HOST, port=DB_PORT
+        )
+        cur = conn.cursor()
+        
+        # Check if ticket_id is already nullable
+        cur.execute("""
+            SELECT is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = 'messages' AND column_name = 'ticket_id'
+        """)
+        result = cur.fetchone()
+        
+        if result and result[0] == 'NO':
+            print("🔧 Making ticket_id nullable in messages table...")
+            cur.execute("ALTER TABLE messages ALTER COLUMN ticket_id DROP NOT NULL")
+            conn.commit()
+            print("✅ ticket_id is now nullable in messages table")
+        else:
+            print("ℹ️ ticket_id is already nullable in messages table")
+        
+        conn.close()
+        
+    except Exception as e:
+        print(f"❌ Error migrating messages table: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+
 
 if __name__ == '__main__':
     with app.app_context():
         create_tickets_table()
         create_ticket_status_logs_table()
         create_email_alert_tables()
+        migrate_messages_table()  # Fix ticket_id nullable issue
     
-    # Setup scheduler for overdue alerts
     setup_scheduler()
     
     app.run(host='0.0.0.0', port=5001, debug=False)
