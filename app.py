@@ -15,7 +15,7 @@ from flask_jwt_extended import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 import bcrypt
-from sqlalchemy import desc, and_, or_
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Text, DateTime, Boolean, ForeignKey, func, and_, or_, text
 from flask_mail import Mail, Message as EmailMessage
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -24,6 +24,19 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import logging
+from logging.handlers import RotatingFileHandler
+import traceback
+
+# Configure comprehensive logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Console output
+        RotatingFileHandler('backend_error.log', maxBytes=10485760, backupCount=5)  # File output
+    ]
+)
+logger = logging.getLogger(__name__)
 
 LINE_ACCESS_TOKEN = "O02yXH2dlIyu9da3bJPfhtHTZYkDJR/wy1TnWj5ZAgBUr0zfiNrY9mC3qm5nEWyILuI+rcVftmsvsQZp+AB8Hf6f5UmDosjtkQY0ufX+JrVwa3i+UwlAXa7UvBQ/JBef2pRD4wJ3QttJyLn1nfh1dQdB04t89/1O/w1cDnyilFU="
 
@@ -55,6 +68,9 @@ ALERT_RECIPIENT_NAME = 'IT Support'
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Disable Werkzeug logging to prevent Unicode errors when SSL requests hit HTTP server
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
+
 # JWT Error Handlers
 @jwt.expired_token_loader
 def expired_token_callback(jwt_header, jwt_payload):
@@ -79,10 +95,10 @@ def revoked_token_callback(jwt_header, jwt_payload):
 # แก้ไข CORS ให้รองรับทุก origin
 CORS(app, origins=["*"], supports_credentials=True)
 
-DB_NAME = 'neondb'
-DB_USER = 'neondb_owner'
-DB_PASSWORD = 'npg_4xWvNOq1rnBI'
-DB_HOST = 'ep-lucky-recipe-a1yjayui-pooler.ap-southeast-1.aws.neon.tech'
+DB_NAME = 'postgres'
+DB_USER = 'postgres'
+DB_PASSWORD = '4321'
+DB_HOST = 'localhost'
 DB_PORT = 5432
 
 # Flask-SQLAlchemy configuration
@@ -277,6 +293,22 @@ class User(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'is_locked': self.is_account_locked()
+        }
+
+class TypeGroupSubgroup(db.Model):
+    __tablename__ = 'type_group_subgroup'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.JSON, nullable=False)  # Store the complete Type/Group/Subgroup structure
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = db.Column(db.String(255), nullable=True)  # Username who made the update
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'data': self.data,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'updated_by': self.updated_by
         }
 
 class UserSession(db.Model):
@@ -1924,6 +1956,89 @@ def save_type_group_subgroup():
         return jsonify({'error': str(e)}), 500
 
 
+# ================= SECURE TYPE/GROUP/SUBGROUP APIs =================
+
+@app.route('/api/type-group-subgroup', methods=['GET'])
+@jwt_required()
+def api_get_type_group_subgroup():
+    """Get Type/Group/Subgroup mapping with JWT authentication."""
+    try:
+        user = get_user_from_token()
+        if not user:
+            return jsonify({'error': 'User not found'}), 401
+        
+        # Log activity
+        log_user_activity(
+            user_id=user.id,
+            action_type='read',
+            resource_type='type_group_subgroup',
+            success=True
+        )
+        
+        data = _load_tgs()
+        return jsonify(data)
+        
+    except Exception as e:
+        logger.error(f"Error in api_get_type_group_subgroup: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/type-group-subgroup', methods=['POST'])
+@jwt_required()
+def api_save_type_group_subgroup():
+    """Save Type/Group/Subgroup mapping with JWT authentication and admin authorization."""
+    try:
+        user = get_user_from_token()
+        if not user:
+            return jsonify({'error': 'User not found'}), 401
+        
+        # Check admin role
+        if user.role != 'admin':
+            log_user_activity(
+                user_id=user.id,
+                action_type='update',
+                resource_type='type_group_subgroup',
+                success=False,
+                error_message='Insufficient permissions - admin role required'
+            )
+            return jsonify({'error': 'Admin role required'}), 403
+        
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Invalid format - expected JSON object'}), 400
+        
+        # Save to file
+        _save_tgs(data)
+        
+        # Log successful activity
+        log_user_activity(
+            user_id=user.id,
+            action_type='update',
+            resource_type='type_group_subgroup',
+            action_details={'data_keys': list(data.keys())},
+            success=True
+        )
+        
+        logger.info(f"Type/Group/Subgroup data updated by user {user.username} (ID: {user.id})")
+        return jsonify({'status': 'success', 'message': 'Type/Group/Subgroup data updated successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error in api_save_type_group_subgroup: {str(e)}")
+        # Log failed activity if user exists
+        try:
+            user = get_user_from_token()
+            if user:
+                log_user_activity(
+                    user_id=user.id,
+                    action_type='update',
+                    resource_type='type_group_subgroup',
+                    success=False,
+                    error_message=str(e)
+                )
+        except:
+            pass
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 
 @app.route('/create-ticket', methods=['GET', 'POST'])
 @jwt_required()
@@ -3057,11 +3172,15 @@ def process_textbox_messages():
             message=f"ข้อความใหม่จาก {user_name}: {textbox_content[:50]}...",
             sender_name=user_name,
             user_id=ticket_id,
-            meta_data={
-                "type": "textbox_message",
-                "ticket_id": ticket_id,
-                "user_name": user_name
-            }
+            timestamp=datetime.utcnow(),
+            read=False,
+            meta_data=json.dumps({
+                "type": "new_message",
+                "user_id": ticket_id,
+                "sender_name": user_name,
+                "sender_type": "user",
+                "ticket_id": ticket_id
+            })
         )
         db.session.add(notification)
         print(f"✅ สร้าง notification แล้ว")
@@ -3142,11 +3261,15 @@ def process_all_textbox_messages():
                         message=f"ข้อความใหม่จาก {user_name}: {textbox_content[:50]}...",
                         sender_name=user_name,
                         user_id=ticket.ticket_id,
-                        meta_data={
-                            "type": "textbox_message",
-                            "ticket_id": ticket.ticket_id,
-                            "user_name": user_name
-                        }
+                        timestamp=datetime.utcnow(),  # เพิ่มบรรทัดนี้
+                        read=False,  # เพิ่มบรรทัดนี้
+                        meta_data=json.dumps({
+                            "type": "new_message",
+                            "user_id": ticket.ticket_id,
+                            "sender_name": user_name,
+                            "sender_type": "user",
+                            "ticket_id": ticket.ticket_id
+                        })
                     )
                     db.session.add(notification)
                     
@@ -3180,10 +3303,18 @@ def process_all_textbox_messages():
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Error processing all textbox messages: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"❌ CRITICAL ERROR in process_all_textbox_messages: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        
+        # Log additional context
+        logger.error(f"Request method: {request.method}")
+        logger.error(f"Request headers: {dict(request.headers)}")
+        
+        return jsonify({
+            "error": str(e),
+            "message": "Critical error in process_all_textbox_messages endpoint",
+            "timestamp": datetime.utcnow().isoformat()
+        }), 500
 
 # Test endpoint to verify server is working
 @app.route('/api/test-messages', methods=['GET', 'POST'])
@@ -3227,11 +3358,11 @@ def get_messages():
                 message=f"ข้อความใหม่จาก {user_name}: {ticket.textbox[:50]}...",
                 sender_name=user_name,
                 user_id=user_id,
-                meta_data={
+                meta_data=json.dumps({
                     "type": "textbox_message",
                     "ticket_id": user_id,
                     "user_name": user_name
-                }
+                })
             )
             db.session.add(notification)
             
@@ -3292,7 +3423,7 @@ def send_message():
         print(f"💬 DEBUG: Final sender_type={sender_type}")
         
         # Check if ticket exists BEFORE creating message
-        ticket = Ticket.query.filter_by(ticket_id=user_id).first()
+        ticket = Ticket.query.filter_by(user_id=user_id).first()
         print(f"🎫 DEBUG: Ticket found: {ticket is not None}")
         
         # Set user_name for display purposes
@@ -3304,7 +3435,7 @@ def send_message():
         
         # Create message
         msg = Message(
-            ticket_id=user_id if ticket else None,  # Only set ticket_id if ticket exists
+            ticket_id=ticket.ticket_id if ticket else None,  # Use actual ticket_id if ticket exists, None otherwise
             user_id=user_id,     # Keep for compatibility
             admin_id=admin_id,
             sender_type=sender_type,
@@ -3312,24 +3443,28 @@ def send_message():
         )
         db.session.add(msg)
         
-        # สร้าง notification เฉพาะเมื่อ user ส่งข้อความ และมี ticket ที่ถูกต้อง
-        if sender_type == 'user' and ticket:
-            notif_msg = f"ข้อความใหม่จาก {user_name}: {message[:50]}{'...' if len(message) > 50 else ''}"
-            add_notification_to_db(
+        # สร้าง notification เฉพาะเมื่อ user ส่งข้อความหา admin
+        if sender_type == 'user':
+            # ใช้ชื่อจาก ticket สำหรับ user (ถ้ามี) หรือใช้ชื่อเริ่มต้น
+            sender_display_name = user_name
+            notif_msg = f"ข้อความใหม่จาก {sender_display_name}: {message[:50]}{'...' if len(message) > 50 else ''}"
+            
+            # สร้าง notification สำหรับข้อความจาก user (ไม่ว่าจะมี ticket หรือไม่)
+            notification = Notification(
                 message=notif_msg,
-                sender_name=user_name,
+                sender_name=sender_display_name,
                 user_id=user_id,
-                meta_data={
+                meta_data=json.dumps({
                     "type": "new_message",
                     "user_id": user_id,
-                    "sender_name": user_name
-                }
+                    "sender_name": sender_display_name,
+                    "sender_type": sender_type
+                })
             )
-            print(f"📢 สร้าง notification สำหรับข้อความจาก user: {user_name}")
+            db.session.add(notification)
+            print(f"Created notification for user message from: {sender_display_name}")
         elif sender_type == 'admin':
-            print(f"🔇 ไม่สร้าง notification สำหรับข้อความจาก admin")
-        else:
-            print(f"🔇 ไม่สร้าง notification เพราะไม่มี ticket ที่ถูกต้อง")
+            print(f"No notification created for admin message (as intended)")
         
         db.session.commit()
         
@@ -4838,7 +4973,7 @@ def delete_ticket_endpoint():
         return jsonify({"error": str(e), "details": error_details}), 500
 
 def setup_scheduler():
-    """Setup background scheduler for overdue alerts"""
+    """Setup background scheduler for overdue alerts and textbox processing"""
     try:
         scheduler = BackgroundScheduler()
         
@@ -4851,15 +4986,98 @@ def setup_scheduler():
             id='overdue_alerts_job'
         )
         
+        # Add job to process textbox messages every 30 seconds
+        scheduler.add_job(
+            func=auto_process_textbox_notifications,
+            trigger=IntervalTrigger(seconds=30),
+            id='textbox_processor',
+            name='Auto-process textbox messages to notifications',
+            replace_existing=True
+        )
+        
         scheduler.start()
-        logger.info("Scheduler started for overdue alerts")
+        print("📅 Background scheduler started:")
+        print("  - Overdue alerts: daily at 9:00 AM")
+        print("  - Textbox processing: every 30 seconds")
         
         # Ensure scheduler shuts down when app exits
         import atexit
         atexit.register(lambda: scheduler.shutdown())
         
     except Exception as e:
-        logger.error(f"Error setting up scheduler: {str(e)}")
+        print(f"❌ Error setting up scheduler: {str(e)}")
+
+def auto_process_textbox_notifications():
+    """Background job function to process textbox messages into notifications"""
+    try:
+        with app.app_context():
+            print("🔄 Auto-processing textbox messages...")
+            
+            # Find all tickets with non-empty textbox content
+            tickets_with_textbox = Ticket.query.filter(
+                and_(
+                    Ticket.textbox.isnot(None),
+                    Ticket.textbox != '',
+                    Ticket.textbox != 'null'
+                )
+            ).all()
+            
+            processed_count = 0
+            
+            for ticket in tickets_with_textbox:
+                try:
+                    textbox_content = ticket.textbox.strip()
+                    if not textbox_content:
+                        continue
+                    
+                    user_name = ticket.name or ticket.ticket_id or "Unknown User"
+                    
+                    # Create notification
+                    notification = Notification(
+                        message=f"ข้อความใหม่จาก {user_name}: {textbox_content[:50]}...",
+                        sender_name=user_name,
+                        user_id=ticket.ticket_id,
+                        timestamp=datetime.utcnow(),
+                        read=False,
+                        meta_data=json.dumps({
+                            "type": "new_message",
+                            "user_id": ticket.ticket_id,
+                            "sender_name": user_name,
+                            "sender_type": "user",
+                            "ticket_id": ticket.ticket_id
+                        })
+                    )
+                    db.session.add(notification)
+                    
+                    # Create message record
+                    message = Message(
+                        user_id=ticket.ticket_id,
+                        admin_id=None,
+                        sender_type="user",
+                        message=textbox_content,
+                        timestamp=datetime.utcnow()
+                    )
+                    db.session.add(message)
+                    
+                    # Clear textbox
+                    ticket.textbox = None
+                    
+                    processed_count += 1
+                    print(f"✅ Processed textbox for ticket {ticket.ticket_id}: {textbox_content[:30]}...")
+                    
+                except Exception as ticket_error:
+                    print(f"❌ Error processing ticket {ticket.ticket_id}: {str(ticket_error)}")
+                    continue
+            
+            if processed_count > 0:
+                db.session.commit()
+                print(f"🎉 Auto-processed {processed_count} textbox messages into notifications")
+            else:
+                print("📭 No textbox messages to process")
+                
+    except Exception as e:
+        logger.error(f"Error in auto_process_textbox_notifications: {str(e)}")
+        db.session.rollback()
 
 @app.route('/api/test-email', methods=['POST'])
 @jwt_required(optional=True)
@@ -4956,20 +5174,192 @@ def migrate_messages_table():
         result = cur.fetchone()
         
         if result and result[0] == 'NO':
-            print("🔧 Making ticket_id nullable in messages table...")
+            print("[INFO] Making ticket_id nullable in messages table...")
             cur.execute("ALTER TABLE messages ALTER COLUMN ticket_id DROP NOT NULL")
             conn.commit()
-            print("✅ ticket_id is now nullable in messages table")
+            print("[OK] ticket_id is now nullable in messages table")
         else:
-            print("ℹ️ ticket_id is already nullable in messages table")
+            print("[INFO] ticket_id is already nullable in messages table")
         
         conn.close()
         
     except Exception as e:
-        print(f"❌ Error migrating messages table: {str(e)}")
+        print(f"[ERROR] Error migrating messages table: {str(e)}")
         if 'conn' in locals():
             conn.close()
 
+
+def setup_scheduler():
+    """Setup background scheduler to auto-process textbox messages into notifications"""
+    try:
+        scheduler = BackgroundScheduler()
+        
+        # Add job to process textbox messages every 30 seconds
+        scheduler.add_job(
+            func=auto_process_textbox_notifications,
+            trigger=IntervalTrigger(seconds=30),
+            id='textbox_processor',
+            name='Auto-process textbox messages to notifications',
+            replace_existing=True
+        )
+        
+        scheduler.start()
+        print("Background scheduler started - will auto-process textbox messages every 30 seconds")
+        
+    except Exception as e:
+        print(f"Error setting up scheduler: {str(e)}")
+
+def auto_process_textbox_notifications():
+    """Background job function to process textbox messages into notifications"""
+    try:
+        with app.app_context():
+            logger.info("Auto-processing textbox messages...")
+            
+            # Test database connection first
+            try:
+                db.session.execute(text('SELECT 1'))
+                logger.info("Database connection successful")
+            except Exception as db_error:
+                logger.error(f"Database connection failed: {str(db_error)}")
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                return
+            
+            # Find all tickets with non-empty textbox content
+            try:
+                tickets_with_textbox = Ticket.query.filter(
+                    and_(
+                        Ticket.textbox.isnot(None),
+                        Ticket.textbox != '',
+                        Ticket.textbox != 'null'
+                    )
+                ).all()
+                logger.info(f"Found {len(tickets_with_textbox)} tickets with textbox messages to process")
+            except Exception as query_error:
+                logger.error(f"Query failed: {str(query_error)}")
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                return
+            
+            processed_count = 0
+            
+            for ticket in tickets_with_textbox:
+                try:
+                    textbox_content = ticket.textbox.strip()
+                    if not textbox_content:
+                        continue
+                    
+                    user_name = ticket.name or ticket.ticket_id or "Unknown User"
+                    logger.info(f"Processing ticket {ticket.ticket_id}: {textbox_content[:30]}...")
+                    
+                    # Create notification
+                    notification = Notification(
+                        message=f"ข้อความใหม่จาก {user_name}: {textbox_content[:50]}...",
+                        sender_name=user_name,
+                        user_id=ticket.ticket_id,
+                        timestamp=datetime.utcnow(),
+                        read=False,
+                        meta_data=json.dumps({
+                            "type": "new_message",
+                            "user_id": ticket.ticket_id,
+                            "sender_name": user_name,
+                            "sender_type": "user",
+                            "ticket_id": ticket.ticket_id
+                        })
+                    )
+                    db.session.add(notification)
+                    
+                    # Create message record
+                    message = Message(
+                        user_id=ticket.ticket_id,
+                        admin_id=None,
+                        sender_type="user",
+                        message=textbox_content,
+                        timestamp=datetime.utcnow()
+                    )
+                    db.session.add(message)
+                    
+                    # Clear textbox
+                    ticket.textbox = None
+                    
+                    processed_count += 1
+                    print(f"Processed textbox for ticket {ticket.ticket_id}: {textbox_content[:30]}...")
+                    
+                except Exception as ticket_error:
+                    print(f"Error processing ticket {ticket.ticket_id}: {str(ticket_error)}")
+                    continue
+            
+            if processed_count > 0:
+                db.session.commit()
+                print(f"Auto-processed {processed_count} textbox messages into notifications")
+            else:
+                print("No textbox messages to process")
+                
+    except Exception as e:
+        print(f"Error in auto_process_textbox_notifications: {str(e)}")
+        db.session.rollback()
+
+# Note: Type/Group/Subgroup API endpoints are defined earlier in the file
+
+# =============================================================================
+# Database Table Creation Functions
+# =============================================================================
+
+def create_type_group_subgroup_table():
+    """Create type_group_subgroup table if it doesn't exist"""
+    try:
+        with app.app_context():
+            db.create_all()
+            logger.info("Type/Group/Subgroup table created or verified")
+            
+            # Check if we have any data, if not create default
+            if TypeGroupSubgroup.query.count() == 0:
+                logger.info("Creating default Type/Group/Subgroup configuration")
+                default_data = {
+                    "Service": {
+                        "Hardware": [
+                            "ลงทะเบียน USB",
+                            "ติดตั้งอุปกรณ์",
+                            "ทดสอบอุปกรณ์",
+                            "ตรวจสอบอุปกรณ์"
+                        ],
+                        "Meeting": [
+                            "ติดตั้งอุปกรณ์ประชุม",
+                            "ขอ Link ประชุม / Zoom",
+                            "เชื่อมต่อ TV",
+                            "ขอยืมอุปกรณ์"
+                        ],
+                        "Software": [
+                            "ติดตั้งโปรแกรม",
+                            "ตั้งค่าโปรแกรม",
+                            "ตรวจสอบโปรแกรม",
+                            "เปิดสิทธิ์การใช้งาน"
+                        ]
+                    },
+                    "Helpdesk": {
+                        "Network": [
+                            "ปัญหาเครือข่าย",
+                            "ตั้งค่า WiFi",
+                            "ปัญหาอินเทอร์เน็ต"
+                        ],
+                        "System": [
+                            "ปัญหาระบบ",
+                            "อัพเดทระบบ",
+                            "ติดตั้งระบบ"
+                        ]
+                    }
+                }
+                
+                default_config = TypeGroupSubgroup(
+                    data=default_data,
+                    updated_by='system'
+                )
+                
+                db.session.add(default_config)
+                db.session.commit()
+                logger.info("Default Type/Group/Subgroup configuration created")
+                
+    except Exception as e:
+        logger.error(f"Error creating Type/Group/Subgroup table: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
 
 if __name__ == '__main__':
     with app.app_context():
@@ -4977,7 +5367,36 @@ if __name__ == '__main__':
         create_ticket_status_logs_table()
         create_email_alert_tables()
         migrate_messages_table()  # Fix ticket_id nullable issue
+        create_type_group_subgroup_table()  # Create new table for Type/Group/Subgroup management
     
     setup_scheduler()
     
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    # HTTPS Configuration for Mixed Content Error Fix
+    import ssl
+    import os
+    
+    # Check if SSL certificate files exist
+    cert_file = 'cert.pem'  # SSL certificate file
+    key_file = 'key.pem'   # SSL private key file
+    
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        print("Starting HTTPS server on port 5004...")
+        print("SSL Certificate found - Running in HTTPS mode")
+        print("Backend URL: https://ticket-backoffice.git.or.th:5004")
+        print("Same domain as frontend - No CORS issues!")
+        
+        # Create SSL context
+        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        context.load_cert_chain(cert_file, key_file)
+        
+        app.run(host='0.0.0.0', port=5004, debug=False, ssl_context=context)
+    else:
+        print("SSL Certificate not found - Running in HTTP mode")
+        print("Backend URL: http://10.10.1.53:5004")
+        print("Mixed Content Error will occur with HTTPS frontend!")
+        print("")
+        print("To fix Mixed Content Error:")
+        print("   1. Generate SSL certificate: cert.pem & key.pem")
+        print("   2. Or change frontend to HTTP: http://ticket-backoffice.git.or.th")
+        
+        app.run(host='0.0.0.0', port=5004, debug=False)

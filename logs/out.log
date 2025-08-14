@@ -1,0 +1,221 @@
+2025-08-14T11:38:23: [INFO] ticket_id is already nullable in messages table
+2025-08-14T11:38:23: Background scheduler started - will auto-process textbox messages every 30 seconds
+2025-08-14T11:38:23: SSL Certificate not found - Running in HTTP mode
+2025-08-14T11:38:23: Backend URL: http://10.10.1.53:5004
+2025-08-14T11:38:23: Mixed Content Error will occur with HTTPS frontend!
+2025-08-14T11:38:23: 
+2025-08-14T11:38:23: To fix Mixed Content Error:
+2025-08-14T11:38:23:    1. Generate SSL certificate: cert.pem & key.pem
+2025-08-14T11:38:23:    2. Or change frontend to HTTP: http://ticket-backoffice.git.or.th
+2025-08-14T11:38:23:  * Serving Flask app 'app'
+2025-08-14T11:38:23:  * Debug mode: off
+2025-08-14T11:38:53: No textbox messages to process
+2025-08-14T11:39:02: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:03: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:04: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:04: 
+2025-08-14T11:39:04: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:05: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:05: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:08: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:10: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:13: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:15: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:15: 
+2025-08-14T11:39:17: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:17: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:17: 
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: 
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: 
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: 
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: 
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: 
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:18: 
+2025-08-14T11:39:19: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:19: 
+2025-08-14T11:39:19: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:19: 
+2025-08-14T11:39:19: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:19: 
+2025-08-14T11:39:19: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:19: 
+2025-08-14T11:39:19: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:19: 
+2025-08-14T11:39:19: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:20: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:20: 
+2025-08-14T11:39:20: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:20: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:20: 
+2025-08-14T11:39:20: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:20: 
+2025-08-14T11:39:20: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:20: 
+2025-08-14T11:39:20: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:20: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:20: 
+2025-08-14T11:39:20: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: 
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: 
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: 
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: 
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:21: 
+2025-08-14T11:39:21: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:22: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:22: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:22: 
+2025-08-14T11:39:22: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:22: 
+2025-08-14T11:39:22: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:22: 
+2025-08-14T11:39:22: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:22: 
+2025-08-14T11:39:22: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:22: 
+2025-08-14T11:39:22: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:22: 
+2025-08-14T11:39:22: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:22: 
+2025-08-14T11:39:23: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:23: 
+2025-08-14T11:39:23: No textbox messages to process
+2025-08-14T11:39:27: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:28: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:32: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:33: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:37: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:37: 
+2025-08-14T11:39:38: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:42: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:43: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:48: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:48: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:53: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:53: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:53: No textbox messages to process
+2025-08-14T11:39:58: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:58: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:39:58: 
+2025-08-14T11:40:03: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:03: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:08: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:08: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:08: 
+2025-08-14T11:40:12: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:12: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:13: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:15: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:18: 
+2025-08-14T11:40:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:18: 
+2025-08-14T11:40:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:18: 
+2025-08-14T11:40:20: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:23: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:23: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:23: No textbox messages to process
+2025-08-14T11:40:25: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:25: 
+2025-08-14T11:40:28: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:28: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:30: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:33: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:33: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:35: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:38: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:38: 
+2025-08-14T11:40:38: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:40: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:43: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:43: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:45: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:48: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:48: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:50: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:53: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:53: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:53: No textbox messages to process
+2025-08-14T11:40:55: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:58: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:40:58: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:00: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:03: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:03: 
+2025-08-14T11:41:03: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:03: 
+2025-08-14T11:41:05: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:08: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:08: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:10: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:13: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:18: 
+2025-08-14T11:41:23: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:23: 
+2025-08-14T11:41:23: No textbox messages to process
+2025-08-14T11:41:28: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:33: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:38: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:43: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:48: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:53: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:41:53: No textbox messages to process
+2025-08-14T11:41:58: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:03: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:08: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:13: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:19: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:19: 
+2025-08-14T11:42:19: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:19: 
+2025-08-14T11:42:23: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:23: No textbox messages to process
+2025-08-14T11:42:28: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:33: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:38: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:43: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:48: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:48: 
+2025-08-14T11:42:53: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:42:53: No textbox messages to process
+2025-08-14T11:42:58: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:03: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:08: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:13: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:18: 
+2025-08-14T11:43:18: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:18: 
+2025-08-14T11:43:23: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:23: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:23: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>
+2025-08-14T11:43:23: No textbox messages to process
+2025-08-14T11:43:25: ERROR: Unexpected error in get_data: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>

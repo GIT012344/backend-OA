@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <system.webServer>
+        <rewrite>
+            <rules>
+                <!-- Backend API Proxy Rule -->
+                <rule name="Backend API Proxy" stopProcessing="true">
+                    <match url="^api/(.*)" />
+                    <conditions>
+                        <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+                        <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+                    </conditions>
+                    <action type="Rewrite" url="http://127.0.0.1:5004/api/{R:1}" />
+                    <serverVariables>
+                        <set name="HTTP_X_FORWARDED_PROTO" value="https" />
+                        <set name="HTTP_X_FORWARDED_HOST" value="{HTTP_HOST}" />
+                        <set name="HTTP_X_REAL_IP" value="{REMOTE_ADDR}" />
+                    </serverVariables>
+                </rule>
+                
+                <!-- WebSocket Proxy (if needed) -->
+                <rule name="Backend WebSocket Proxy" stopProcessing="true">
+                    <match url="^socket.io/(.*)" />
+                    <conditions>
+                        <add input="{HTTP_UPGRADE}" pattern="websocket" ignoreCase="true" />
+                    </conditions>
+                    <action type="Rewrite" url="http://127.0.0.1:5004/socket.io/{R:1}" />
+                </rule>
+            </rules>
+        </rewrite>
+        
+        <!-- Enable Application Request Routing (ARR) -->
+        <system.webServer>
+            <proxy enabled="true" />
+        </system.webServer>
+    </system.webServer>
+</configuration>
+
+<!-- 
+INSTALLATION INSTRUCTIONS:
+1. Install URL Rewrite Module for IIS (if not already installed)
+2. Install Application Request Routing (ARR) for IIS
+3. Add this configuration to your IIS site's web.config
+4. Or configure via IIS Manager:
+   - Open IIS Manager
+   - Select your site (ticket-backoffice.git.or.th)
+   - Double-click "URL Rewrite"
+   - Add Rule -> Blank Rule
+   - Name: Backend API Proxy
+   - Pattern: ^api/(.*)
+   - Action Type: Rewrite
+   - Rewrite URL: http://127.0.0.1:5004/api/{R:1}
+   - Check "Stop processing of subsequent rules"
+
+RESULT:
+- https://ticket-backoffice.git.or.th/api/* -> http://127.0.0.1:5004/api/*
+- Frontend and Backend both accessible via same domain
+- No Mixed Content Error
+- Uses trusted SSL certificate from IIS
+-->
