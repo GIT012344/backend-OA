@@ -1,0 +1,952 @@
+2025-08-19T10:06:52: 2025-08-19 10:06:52,160 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:06:52: 2025-08-19 10:06:52,168 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:06:52: 2025-08-19 10:06:52,168 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:06:52: 2025-08-19 10:06:52,259 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:06:52: 2025-08-19 10:06:52,261 - __main__ - INFO - Database connection successful
+2025-08-19T10:06:52: 2025-08-19 10:06:52,267 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:06:52: 2025-08-19 10:06:52,274 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:06:52: 2025-08-19 10:06:52,288 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:06:52: 2025-08-19 10:06:52,288 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:06:52: 2025-08-19 10:06:52,289 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:06:52: 2025-08-19 10:06:52,290 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:06:52: 2025-08-19 10:06:52,290 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:06:52: 2025-08-19 10:06:52,291 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:06:52: 2025-08-19 10:06:52,291 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:06:52: 2025-08-19 10:06:52,291 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:06:52: 2025-08-19 10:06:52,306 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:07:09: 2025-08-19 10:07:09,976 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:07:10: 2025-08-19 10:07:10,065 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:07:10: 2025-08-19 10:07:10,463 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:11:46: 2025-08-19 10:11:46,555 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:11:46: 2025-08-19 10:11:46,560 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:11:46: 2025-08-19 10:11:46,560 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:11:46: 2025-08-19 10:11:46,636 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:11:46: 2025-08-19 10:11:46,636 - __main__ - INFO - Database connection successful
+2025-08-19T10:11:46: 2025-08-19 10:11:46,644 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:11:46: 2025-08-19 10:11:46,653 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:11:46: 2025-08-19 10:11:46,669 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:11:46: 2025-08-19 10:11:46,671 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:11:46: 2025-08-19 10:11:46,672 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:11:46: 2025-08-19 10:11:46,672 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:11:46: 2025-08-19 10:11:46,672 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:11:46: 2025-08-19 10:11:46,674 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:11:46: 2025-08-19 10:11:46,674 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:11:46: 2025-08-19 10:11:46,674 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:11:46: 2025-08-19 10:11:46,685 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:11:50: 2025-08-19 10:11:50,677 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:11:51: 2025-08-19 10:11:51,358 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:11:52: 2025-08-19 10:11:52,038 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:11:52: 2025-08-19 10:11:52,828 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:11:52: 2025-08-19 10:11:52,985 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:11:59: 2025-08-19 10:11:59,791 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:11:59: 2025-08-19 10:11:59,794 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:11:59: 2025-08-19 10:11:59,794 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:11:59: 2025-08-19 10:11:59,865 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:11:59: 2025-08-19 10:11:59,867 - __main__ - INFO - Database connection successful
+2025-08-19T10:11:59: 2025-08-19 10:11:59,872 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:11:59: 2025-08-19 10:11:59,875 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:11:59: 2025-08-19 10:11:59,891 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:11:59: 2025-08-19 10:11:59,891 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:11:59: 2025-08-19 10:11:59,894 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:11:59: 2025-08-19 10:11:59,894 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:11:59: 2025-08-19 10:11:59,894 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:11:59: 2025-08-19 10:11:59,894 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:11:59: 2025-08-19 10:11:59,894 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:11:59: 2025-08-19 10:11:59,894 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:11:59: 2025-08-19 10:11:59,911 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:12:15: 2025-08-19 10:12:15,844 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:15: 2025-08-19 10:12:15,936 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:16: 2025-08-19 10:12:16,080 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:16: 2025-08-19 10:12:16,086 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:17: 2025-08-19 10:12:17,775 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:18: 2025-08-19 10:12:18,111 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:21: 2025-08-19 10:12:21,703 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:22: 2025-08-19 10:12:22,111 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:22: 2025-08-19 10:12:22,283 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:22: 2025-08-19 10:12:22,553 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:22: 2025-08-19 10:12:22,981 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:23: 2025-08-19 10:12:23,061 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:23: 2025-08-19 10:12:23,137 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:23: 2025-08-19 10:12:23,483 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:23: 2025-08-19 10:12:23,536 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:23: 2025-08-19 10:12:23,607 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:23: 2025-08-19 10:12:23,653 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:23: 2025-08-19 10:12:23,831 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:24: 2025-08-19 10:12:24,411 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:24: 2025-08-19 10:12:24,575 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:24: 2025-08-19 10:12:24,853 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:24: 2025-08-19 10:12:24,923 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:25: 2025-08-19 10:12:25,082 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:25: 2025-08-19 10:12:25,136 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:25: 2025-08-19 10:12:25,436 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:25: 2025-08-19 10:12:25,701 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:25: 2025-08-19 10:12:25,825 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:26: 2025-08-19 10:12:26,173 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:26: 2025-08-19 10:12:26,453 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:26: 2025-08-19 10:12:26,518 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:26: 2025-08-19 10:12:26,665 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:26: 2025-08-19 10:12:26,712 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:26: 2025-08-19 10:12:26,872 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:27: 2025-08-19 10:12:27,453 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:27: 2025-08-19 10:12:27,545 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:34: 2025-08-19 10:12:34,717 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:12:34: 2025-08-19 10:12:34,722 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:12:34: 2025-08-19 10:12:34,723 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:12:34: 2025-08-19 10:12:34,803 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:12:34: 2025-08-19 10:12:34,808 - __main__ - INFO - Database connection successful
+2025-08-19T10:12:34: 2025-08-19 10:12:34,812 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:12:34: 2025-08-19 10:12:34,820 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:12:34: 2025-08-19 10:12:34,835 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:12:34: 2025-08-19 10:12:34,835 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:12:34: 2025-08-19 10:12:34,836 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:12:34: 2025-08-19 10:12:34,836 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:12:34: 2025-08-19 10:12:34,836 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:12:34: 2025-08-19 10:12:34,836 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:12:34: 2025-08-19 10:12:34,836 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:12:34: 2025-08-19 10:12:34,836 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:12:34: 2025-08-19 10:12:34,853 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:12:49: 2025-08-19 10:12:49,186 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:49: 2025-08-19 10:12:49,304 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:49: 2025-08-19 10:12:49,562 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:49: 2025-08-19 10:12:49,658 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:49: 2025-08-19 10:12:49,686 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:49: 2025-08-19 10:12:49,775 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:49: 2025-08-19 10:12:49,836 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,104 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,212 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,277 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,323 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,345 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,362 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,433 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,512 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,602 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,613 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,871 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:50: 2025-08-19 10:12:50,982 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:51: 2025-08-19 10:12:51,017 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:51: 2025-08-19 10:12:51,227 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:51: 2025-08-19 10:12:51,517 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:51: 2025-08-19 10:12:51,567 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:51: 2025-08-19 10:12:51,776 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:52: 2025-08-19 10:12:52,136 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:52: 2025-08-19 10:12:52,245 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:52: 2025-08-19 10:12:52,486 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:52: 2025-08-19 10:12:52,620 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:52: 2025-08-19 10:12:52,776 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:53: 2025-08-19 10:12:53,226 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:53: 2025-08-19 10:12:53,336 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:53: 2025-08-19 10:12:53,476 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:53: 2025-08-19 10:12:53,518 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:53: 2025-08-19 10:12:53,604 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:53: 2025-08-19 10:12:53,808 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:54: 2025-08-19 10:12:54,168 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:54: 2025-08-19 10:12:54,233 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:54: 2025-08-19 10:12:54,274 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:54: 2025-08-19 10:12:54,495 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:55: 2025-08-19 10:12:55,411 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:55: 2025-08-19 10:12:55,672 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:55: 2025-08-19 10:12:55,926 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:56: 2025-08-19 10:12:56,168 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:56: 2025-08-19 10:12:56,376 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:56: 2025-08-19 10:12:56,436 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:56: 2025-08-19 10:12:56,476 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:56: 2025-08-19 10:12:56,758 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:57: 2025-08-19 10:12:57,066 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:57: 2025-08-19 10:12:57,374 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:57: 2025-08-19 10:12:57,613 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:57: 2025-08-19 10:12:57,816 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:57: 2025-08-19 10:12:57,867 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:58: 2025-08-19 10:12:58,143 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:58: 2025-08-19 10:12:58,608 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:58: 2025-08-19 10:12:58,726 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:58: 2025-08-19 10:12:58,923 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:59: 2025-08-19 10:12:59,071 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:59: 2025-08-19 10:12:59,117 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:59: 2025-08-19 10:12:59,195 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:59: 2025-08-19 10:12:59,495 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:59: 2025-08-19 10:12:59,870 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:12:59: 2025-08-19 10:12:59,998 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:00: 2025-08-19 10:13:00,837 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:02: 2025-08-19 10:13:02,566 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:02: 2025-08-19 10:13:02,646 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:02: 2025-08-19 10:13:02,704 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:02: 2025-08-19 10:13:02,995 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:03: 2025-08-19 10:13:03,104 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:03: 2025-08-19 10:13:03,237 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:09: 2025-08-19 10:13:09,766 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:13:09: 2025-08-19 10:13:09,777 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:13:09: 2025-08-19 10:13:09,777 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:13:09: 2025-08-19 10:13:09,859 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:13:09: 2025-08-19 10:13:09,862 - __main__ - INFO - Database connection successful
+2025-08-19T10:13:09: 2025-08-19 10:13:09,870 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:13:09: 2025-08-19 10:13:09,878 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:13:09: 2025-08-19 10:13:09,893 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:13:09: 2025-08-19 10:13:09,893 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:13:09: 2025-08-19 10:13:09,893 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:13:09: 2025-08-19 10:13:09,893 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:13:09: 2025-08-19 10:13:09,895 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:13:09: 2025-08-19 10:13:09,895 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:13:09: 2025-08-19 10:13:09,895 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:13:09: 2025-08-19 10:13:09,895 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:13:09: 2025-08-19 10:13:09,911 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:13:31: 2025-08-19 10:13:31,771 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:32: 2025-08-19 10:13:32,121 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:32: 2025-08-19 10:13:32,676 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:32: 2025-08-19 10:13:32,763 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:32: 2025-08-19 10:13:32,932 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:33: 2025-08-19 10:13:33,169 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:33: 2025-08-19 10:13:33,343 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:33: 2025-08-19 10:13:33,437 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:33: 2025-08-19 10:13:33,637 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:34: 2025-08-19 10:13:34,263 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:34: 2025-08-19 10:13:34,382 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:34: 2025-08-19 10:13:34,442 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:34: 2025-08-19 10:13:34,623 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:34: 2025-08-19 10:13:34,727 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:34: 2025-08-19 10:13:34,824 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:34: 2025-08-19 10:13:34,874 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:35: 2025-08-19 10:13:35,121 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:44: 2025-08-19 10:13:44,813 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:13:44: 2025-08-19 10:13:44,821 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:13:44: 2025-08-19 10:13:44,821 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:13:44: 2025-08-19 10:13:44,887 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:13:44: 2025-08-19 10:13:44,893 - __main__ - INFO - Database connection successful
+2025-08-19T10:13:44: 2025-08-19 10:13:44,896 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:13:44: 2025-08-19 10:13:44,905 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:13:44: 2025-08-19 10:13:44,922 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:13:44: 2025-08-19 10:13:44,922 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:13:44: 2025-08-19 10:13:44,924 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:13:44: 2025-08-19 10:13:44,924 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:13:44: 2025-08-19 10:13:44,925 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:13:44: 2025-08-19 10:13:44,925 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:13:44: 2025-08-19 10:13:44,925 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:13:44: 2025-08-19 10:13:44,925 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:13:44: 2025-08-19 10:13:44,938 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:13:48: 2025-08-19 10:13:48,709 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:48: 2025-08-19 10:13:48,772 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:48: 2025-08-19 10:13:48,805 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:48: 2025-08-19 10:13:48,905 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,103 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,183 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,259 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,305 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,347 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,403 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,414 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,513 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,550 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,590 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,646 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,677 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,769 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,810 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,846 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,917 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,967 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:49: 2025-08-19 10:13:49,983 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,037 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,088 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,225 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,421 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,469 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,503 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,559 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,579 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,627 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,655 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,690 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,738 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,745 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,782 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,946 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:50: 2025-08-19 10:13:50,979 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,021 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,043 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,072 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,082 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,088 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,227 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,237 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,374 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,398 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,488 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,565 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,622 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,870 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,905 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:51: 2025-08-19 10:13:51,963 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,063 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,065 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,155 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,198 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,237 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,359 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,396 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,403 - waitress.queue - WARNING - Task queue depth is 2
+2025-08-19T10:13:52: 2025-08-19 10:13:52,446 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,497 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,577 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,588 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,727 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,738 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,794 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,846 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:52: 2025-08-19 10:13:52,998 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,038 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,050 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,077 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,087 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,148 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,178 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,188 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,277 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,338 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,377 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,433 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,690 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,737 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,746 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,803 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,827 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:53: 2025-08-19 10:13:53,868 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,025 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,070 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,177 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,255 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,313 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,353 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,360 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,363 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,488 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,535 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,578 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,643 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,769 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:54: 2025-08-19 10:13:54,988 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,097 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,131 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,227 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,288 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,335 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,593 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,684 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,763 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,803 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,813 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,856 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,897 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:55: 2025-08-19 10:13:55,955 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,063 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,114 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,170 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,173 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,259 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,413 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,472 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,516 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,563 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,605 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,614 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,664 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,799 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,859 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,872 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,909 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,917 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,950 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:56: 2025-08-19 10:13:56,967 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,062 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,072 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,078 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,117 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,121 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,146 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,188 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,337 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,347 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,385 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,433 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,545 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,616 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,627 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,664 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,744 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,777 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,944 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,972 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,977 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:57: 2025-08-19 10:13:57,988 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,025 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,060 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,083 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,120 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,155 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,214 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,246 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,267 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,296 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,388 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,427 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,577 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:58: 2025-08-19 10:13:58,922 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,296 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,339 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,477 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,505 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,546 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,625 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,684 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,764 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,808 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:13:59: 2025-08-19 10:13:59,855 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,070 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,114 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,159 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,364 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,596 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,631 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,672 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,754 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,779 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,809 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:00: 2025-08-19 10:14:00,913 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:00,997 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,173 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,226 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,270 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,328 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,507 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,541 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,664 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,750 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,838 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:01: 2025-08-19 10:14:01,964 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,047 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,063 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,105 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,139 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,188 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,217 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,363 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,374 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,397 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,453 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,497 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,505 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,554 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,591 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,710 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,797 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,844 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,855 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:02: 2025-08-19 10:14:02,897 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,053 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,094 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,183 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,229 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,247 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,290 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,298 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,393 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,538 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,561 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,623 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,676 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,681 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,778 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:03: 2025-08-19 10:14:03,910 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:04: 2025-08-19 10:14:04,047 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:04: 2025-08-19 10:14:04,183 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:04: 2025-08-19 10:14:04,297 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:04: 2025-08-19 10:14:04,355 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:04: 2025-08-19 10:14:04,587 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,218 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,250 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,283 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,326 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,334 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,374 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,655 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,659 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,697 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,707 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,770 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,847 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:05: 2025-08-19 10:14:05,947 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:05,997 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,054 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,133 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,156 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,203 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,227 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,258 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,314 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,353 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,431 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,591 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,603 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,650 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,697 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,898 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:06: 2025-08-19 10:14:06,986 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,021 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,024 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,064 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,197 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,297 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,529 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,578 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,588 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,705 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,755 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,778 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,881 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,912 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,950 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,989 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:07: 2025-08-19 10:14:07,997 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:07,997 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,010 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,047 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,100 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,178 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,222 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,238 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,289 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,344 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,422 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,429 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,478 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,488 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,530 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,590 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,721 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,780 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,814 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,856 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,864 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,906 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:08: 2025-08-19 10:14:08,946 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:08,998 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,033 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,150 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,203 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,225 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,236 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,277 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,297 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,383 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,438 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,478 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,513 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,604 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,624 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,726 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,797 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,806 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,822 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,876 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,954 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:09: 2025-08-19 10:14:09,997 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,113 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,117 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,155 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,225 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,288 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,354 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,360 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,397 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,418 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,447 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,514 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,556 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,616 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,698 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,703 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,739 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,764 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,818 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,825 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,905 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,964 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:10: 2025-08-19 10:14:10,978 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,022 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,067 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,113 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,124 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,173 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,214 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,267 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,360 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,375 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,425 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,477 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,555 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,606 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,678 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,714 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,724 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,764 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,809 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,870 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,880 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,888 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,956 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,970 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:11: 2025-08-19 10:14:11,983 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,020 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,067 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,117 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,167 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,197 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,232 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,269 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,349 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,365 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,409 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,416 - waitress.queue - WARNING - Task queue depth is 2
+2025-08-19T10:14:12: 2025-08-19 10:14:12,424 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,434 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,464 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,513 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,541 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,555 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,603 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,615 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,700 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,753 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,833 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,894 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,899 - waitress.queue - WARNING - Task queue depth is 2
+2025-08-19T10:14:12: 2025-08-19 10:14:12,927 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,954 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:12: 2025-08-19 10:14:12,988 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:13: 2025-08-19 10:14:13,003 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:13: 2025-08-19 10:14:13,057 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:13: 2025-08-19 10:14:13,088 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:13: 2025-08-19 10:14:13,145 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:13: 2025-08-19 10:14:13,148 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:13: 2025-08-19 10:14:13,224 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:13: 2025-08-19 10:14:13,261 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:19: 2025-08-19 10:14:19,786 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:14:19: 2025-08-19 10:14:19,789 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:14:19: 2025-08-19 10:14:19,789 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:14:19: 2025-08-19 10:14:19,885 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:14:19: 2025-08-19 10:14:19,889 - __main__ - INFO - Database connection successful
+2025-08-19T10:14:19: 2025-08-19 10:14:19,895 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:14:19: 2025-08-19 10:14:19,904 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:14:19: 2025-08-19 10:14:19,923 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:14:19: 2025-08-19 10:14:19,924 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:14:19: 2025-08-19 10:14:19,925 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:14:19: 2025-08-19 10:14:19,926 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:14:19: 2025-08-19 10:14:19,926 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:14:19: 2025-08-19 10:14:19,927 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:14:19: 2025-08-19 10:14:19,927 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:14:19: 2025-08-19 10:14:19,928 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:14:19: 2025-08-19 10:14:19,944 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:14:31: 2025-08-19 10:14:31,625 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:31: 2025-08-19 10:14:31,806 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:31: 2025-08-19 10:14:31,922 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:31: 2025-08-19 10:14:31,973 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:32: 2025-08-19 10:14:32,189 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:32: 2025-08-19 10:14:32,389 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:14:54: 2025-08-19 10:14:54,685 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:14:54: 2025-08-19 10:14:54,689 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:14:54: 2025-08-19 10:14:54,689 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:14:54: 2025-08-19 10:14:54,779 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:14:54: 2025-08-19 10:14:54,779 - __main__ - INFO - Database connection successful
+2025-08-19T10:14:54: 2025-08-19 10:14:54,786 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:14:54: 2025-08-19 10:14:54,795 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:14:54: 2025-08-19 10:14:54,811 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:14:54: 2025-08-19 10:14:54,811 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:14:54: 2025-08-19 10:14:54,811 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:14:54: 2025-08-19 10:14:54,811 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:14:54: 2025-08-19 10:14:54,814 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:14:54: 2025-08-19 10:14:54,815 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:14:54: 2025-08-19 10:14:54,815 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:14:54: 2025-08-19 10:14:54,815 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:14:54: 2025-08-19 10:14:54,829 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:15:09: 2025-08-19 10:15:09,226 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:09: 2025-08-19 10:15:09,939 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:10: 2025-08-19 10:15:10,049 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:10: 2025-08-19 10:15:10,557 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:10: 2025-08-19 10:15:10,826 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:11: 2025-08-19 10:15:11,027 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:11: 2025-08-19 10:15:11,181 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:11: 2025-08-19 10:15:11,658 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:11: 2025-08-19 10:15:11,839 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:12: 2025-08-19 10:15:12,271 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:12: 2025-08-19 10:15:12,499 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:12: 2025-08-19 10:15:12,548 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:13: 2025-08-19 10:15:13,079 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:13: 2025-08-19 10:15:13,240 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:13: 2025-08-19 10:15:13,974 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:14: 2025-08-19 10:15:14,216 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:14: 2025-08-19 10:15:14,489 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:14: 2025-08-19 10:15:14,796 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:14: 2025-08-19 10:15:14,880 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:15: 2025-08-19 10:15:15,391 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:15: 2025-08-19 10:15:15,474 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:15: 2025-08-19 10:15:15,649 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:15: 2025-08-19 10:15:15,862 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:15: 2025-08-19 10:15:15,921 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:16: 2025-08-19 10:15:16,148 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:16: 2025-08-19 10:15:16,574 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:16: 2025-08-19 10:15:16,649 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:16: 2025-08-19 10:15:16,885 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:17: 2025-08-19 10:15:17,107 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:17: 2025-08-19 10:15:17,332 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:17: 2025-08-19 10:15:17,530 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:17: 2025-08-19 10:15:17,710 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:17: 2025-08-19 10:15:17,832 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:18: 2025-08-19 10:15:18,279 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:20: 2025-08-19 10:15:20,129 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:20: 2025-08-19 10:15:20,477 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:20: 2025-08-19 10:15:20,647 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:20: 2025-08-19 10:15:20,793 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:20: 2025-08-19 10:15:20,900 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:20: 2025-08-19 10:15:20,957 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:21: 2025-08-19 10:15:21,421 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:22: 2025-08-19 10:15:22,379 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:22: 2025-08-19 10:15:22,469 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:29: 2025-08-19 10:15:29,773 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:15:29: 2025-08-19 10:15:29,780 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:15:29: 2025-08-19 10:15:29,780 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:15:29: 2025-08-19 10:15:29,871 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:15:29: 2025-08-19 10:15:29,875 - __main__ - INFO - Database connection successful
+2025-08-19T10:15:29: 2025-08-19 10:15:29,881 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:15:29: 2025-08-19 10:15:29,890 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:15:29: 2025-08-19 10:15:29,905 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:15:29: 2025-08-19 10:15:29,905 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:15:29: 2025-08-19 10:15:29,908 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:15:29: 2025-08-19 10:15:29,908 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:15:29: 2025-08-19 10:15:29,908 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:15:29: 2025-08-19 10:15:29,908 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:15:29: 2025-08-19 10:15:29,908 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:15:29: 2025-08-19 10:15:29,908 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:15:29: 2025-08-19 10:15:29,924 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:15:34: 2025-08-19 10:15:34,399 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:35: 2025-08-19 10:15:35,038 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:35: 2025-08-19 10:15:35,449 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:36: 2025-08-19 10:15:36,033 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:37: 2025-08-19 10:15:37,185 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:38: 2025-08-19 10:15:38,518 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:38: 2025-08-19 10:15:38,623 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:38: 2025-08-19 10:15:38,773 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:38: 2025-08-19 10:15:38,877 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:39: 2025-08-19 10:15:39,096 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:39: 2025-08-19 10:15:39,237 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:39: 2025-08-19 10:15:39,486 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:39: 2025-08-19 10:15:39,878 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:40: 2025-08-19 10:15:40,574 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:40: 2025-08-19 10:15:40,958 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:41: 2025-08-19 10:15:41,775 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:42: 2025-08-19 10:15:42,063 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:42: 2025-08-19 10:15:42,110 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:42: 2025-08-19 10:15:42,362 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:42: 2025-08-19 10:15:42,412 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:42: 2025-08-19 10:15:42,558 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:42: 2025-08-19 10:15:42,791 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:42: 2025-08-19 10:15:42,899 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:43: 2025-08-19 10:15:43,078 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:43: 2025-08-19 10:15:43,549 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:43: 2025-08-19 10:15:43,630 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:44: 2025-08-19 10:15:44,944 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:44: 2025-08-19 10:15:44,991 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:45: 2025-08-19 10:15:45,440 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:45: 2025-08-19 10:15:45,956 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:46: 2025-08-19 10:15:46,286 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:46: 2025-08-19 10:15:46,693 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:46: 2025-08-19 10:15:46,811 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:46: 2025-08-19 10:15:46,861 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:46: 2025-08-19 10:15:46,985 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:47: 2025-08-19 10:15:47,062 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:47: 2025-08-19 10:15:47,359 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:47: 2025-08-19 10:15:47,958 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:48: 2025-08-19 10:15:48,471 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:48: 2025-08-19 10:15:48,518 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:48: 2025-08-19 10:15:48,580 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:48: 2025-08-19 10:15:48,645 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:48: 2025-08-19 10:15:48,712 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:48: 2025-08-19 10:15:48,869 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,144 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,201 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,370 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,427 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,482 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,539 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,641 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,675 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,688 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,787 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,839 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,911 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,973 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,980 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:49: 2025-08-19 10:15:49,991 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,032 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,201 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,245 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,328 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,349 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,412 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,466 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,555 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,638 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,712 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,798 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:50: 2025-08-19 10:15:50,891 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,028 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,099 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,113 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,123 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,126 - waitress.queue - WARNING - Task queue depth is 2
+2025-08-19T10:15:51: 2025-08-19 10:15:51,184 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,200 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,229 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,305 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,382 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,430 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,473 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,550 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,570 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,580 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,684 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,770 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,841 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,848 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:51: 2025-08-19 10:15:51,962 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,041 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,102 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,181 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,239 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,266 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,302 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,316 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,373 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,505 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,571 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,608 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,687 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,701 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,708 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,750 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,767 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,833 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,878 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,898 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:52: 2025-08-19 10:15:52,963 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,008 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,029 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,130 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,241 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,289 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,341 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,358 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,467 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,506 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,559 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,858 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,890 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,900 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,951 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:53: 2025-08-19 10:15:53,991 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,030 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,056 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,091 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,170 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,280 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,339 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,370 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,405 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,480 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,553 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,563 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,702 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,828 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:54: 2025-08-19 10:15:54,925 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,154 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,189 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,235 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,639 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,700 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,717 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,812 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,825 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,920 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,930 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:55: 2025-08-19 10:15:55,994 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:56: 2025-08-19 10:15:56,032 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:56: 2025-08-19 10:15:56,692 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:56: 2025-08-19 10:15:56,747 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:56: 2025-08-19 10:15:56,900 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:56: 2025-08-19 10:15:56,941 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:56: 2025-08-19 10:15:56,958 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,009 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,067 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,112 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,197 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,276 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,370 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,431 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,450 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,487 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,506 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,599 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,613 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,712 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,723 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,758 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,931 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:57: 2025-08-19 10:15:57,972 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:58: 2025-08-19 10:15:58,022 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:58: 2025-08-19 10:15:58,067 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:58: 2025-08-19 10:15:58,073 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:58: 2025-08-19 10:15:58,200 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:58: 2025-08-19 10:15:58,212 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:15:58: 2025-08-19 10:15:58,432 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:04: 2025-08-19 10:16:04,830 - __main__ - INFO - Default email templates initialized
+2025-08-19T10:16:04: 2025-08-19 10:16:04,836 - __main__ - INFO - Default alert settings initialized
+2025-08-19T10:16:04: 2025-08-19 10:16:04,836 - __main__ - INFO - Email alert tables created and initialized
+2025-08-19T10:16:04: 2025-08-19 10:16:04,903 - __main__ - INFO - Auto-processing textbox messages...
+2025-08-19T10:16:04: 2025-08-19 10:16:04,905 - __main__ - INFO - Database connection successful
+2025-08-19T10:16:04: 2025-08-19 10:16:04,913 - __main__ - INFO - Found 0 tickets with textbox messages to process
+2025-08-19T10:16:04: 2025-08-19 10:16:04,920 - __main__ - INFO - Type/Group/Subgroup table created or verified
+2025-08-19T10:16:04: 2025-08-19 10:16:04,933 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:16:04: 2025-08-19 10:16:04,933 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-08-19T10:16:04: 2025-08-19 10:16:04,936 - apscheduler.scheduler - INFO - Added job "check_and_send_overdue_alerts" to job store "default"
+2025-08-19T10:16:04: 2025-08-19 10:16:04,936 - apscheduler.scheduler - INFO - Added job "Auto-process textbox messages to notifications" to job store "default"
+2025-08-19T10:16:04: 2025-08-19 10:16:04,936 - apscheduler.scheduler - INFO - Scheduler started
+2025-08-19T10:16:04: 2025-08-19 10:16:04,938 - __main__ - INFO - Background scheduler started:
+2025-08-19T10:16:04: 2025-08-19 10:16:04,938 - __main__ - INFO -   - Overdue alerts: daily at 9:00 AM
+2025-08-19T10:16:04: 2025-08-19 10:16:04,938 - __main__ - INFO -   - Textbox processing: every 30 minutes
+2025-08-19T10:16:04: 2025-08-19 10:16:04,950 - waitress - INFO - Serving on http://0.0.0.0:5004
+2025-08-19T10:16:08: 2025-08-19 10:16:08,728 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:09: 2025-08-19 10:16:09,000 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:09: 2025-08-19 10:16:09,507 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:09: 2025-08-19 10:16:09,608 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:09: 2025-08-19 10:16:09,958 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:11: 2025-08-19 10:16:11,124 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:11: 2025-08-19 10:16:11,291 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:11: 2025-08-19 10:16:11,587 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:11: 2025-08-19 10:16:11,642 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:11: 2025-08-19 10:16:11,929 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:12: 2025-08-19 10:16:12,040 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:12: 2025-08-19 10:16:12,141 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:12: 2025-08-19 10:16:12,207 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:12: 2025-08-19 10:16:12,890 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:12: 2025-08-19 10:16:12,950 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:13: 2025-08-19 10:16:13,417 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:13: 2025-08-19 10:16:13,581 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:14: 2025-08-19 10:16:14,857 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:14: 2025-08-19 10:16:14,917 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:15: 2025-08-19 10:16:15,017 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:15: 2025-08-19 10:16:15,181 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:16: 2025-08-19 10:16:16,091 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:16: 2025-08-19 10:16:16,175 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:16: 2025-08-19 10:16:16,628 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:16: 2025-08-19 10:16:16,681 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:16: 2025-08-19 10:16:16,922 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:17: 2025-08-19 10:16:17,537 - waitress.queue - WARNING - Task queue depth is 1
+2025-08-19T10:16:18: 2025-08-19 10:16:18,097 - waitress.queue - WARNING - Task queue depth is 1

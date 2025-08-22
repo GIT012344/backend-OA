@@ -28,20 +28,20 @@ def export_certificate_from_windows_store():
         result = subprocess.run(cert_export_cmd, capture_output=True, text=True, cwd=os.getcwd())
         
         if result.returncode == 0:
-            print("✅ Certificate exported successfully to cert_from_iis.pem")
+            print(" Certificate exported successfully to cert_from_iis.pem")
         else:
-            print(f"❌ Certificate export failed: {result.stderr}")
+            print(f" Certificate export failed: {result.stderr}")
             return False
         
         # Note: Private key export requires additional steps and permissions
-        print("\n⚠️  Private Key Export:")
+        print("\n  Private Key Export:")
         print("Private key export requires special permissions and is complex.")
         print("We'll try to use the certificate store directly in Python instead.")
         
         return True
         
     except Exception as e:
-        print(f"❌ Error exporting certificate: {str(e)}")
+        print(f" Error exporting certificate: {str(e)}")
         return False
 
 def create_certificate_usage_script():

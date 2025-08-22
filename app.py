@@ -26,13 +26,14 @@ from email.mime.multipart import MIMEMultipart
 import logging
 from logging.handlers import RotatingFileHandler
 import traceback
+import sys
 
 # Configure comprehensive logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(),  # Console output
+        logging.StreamHandler(sys.stdout),  # Console output to stdout instead of stderr
         RotatingFileHandler('backend_error.log', maxBytes=10485760, backupCount=5)  # File output
     ]
 )
@@ -643,7 +644,7 @@ def send_smtp_email(recipient_email, subject, body):
           <body>
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <div style="background-color: #005BBB; color: white; padding: 20px; text-align: center;">
-                <h1>🎫 Ticket Management System</h1>
+                <h1> Ticket Management System</h1>
               </div>
               <div style="padding: 20px; background-color: #f9f9f9;">
                 {body.replace(chr(10), '<br>')}
@@ -751,21 +752,21 @@ def check_and_send_overdue_alerts():
 
 Ticket ต่อไปนี้ค้างเป็นเวลา {days_overdue} วัน (แจ้งเตือน{frequency_desc}):
 
-📋 รหัสทิกเก็ต: {ticket.ticket_id}
-👤 ชื่อลูกค้า: {ticket.name or 'N/A'}
-📧 อีเมล: {ticket.email or 'N/A'}
-📞 เบอร์โทร: {ticket.phone or 'N/A'}
-🏢 แผนก: {ticket.department or 'N/A'}
-📝 ประเภท: {ticket.type or 'N/A'}
-📅 วันนัดหมาย: {ticket.appointment or 'N/A'}
-🔖 กลุ่ม: {ticket.report or 'N/A'}
-🏷️ กลุ่มย่อย: {getattr(ticket, 'subgroup', None) or 'N/A'}
-📄 รายงาน: {ticket.report or 'N/A'}
-🎯 ความต้องการ: {ticket.requested or 'N/A'}
-📅 วันที่สร้าง: {ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'}
-🔄 สถานะปัจจุบัน: {ticket.status}
-⏰ ค้างมาแล้ว: {days_overdue} วัน
-🔔 ความถี่การแจ้งเตือน: {frequency_desc}
+ รหัสทิกเก็ต: {ticket.ticket_id}
+ ชื่อลูกค้า: {ticket.name or 'N/A'}
+ อีเมล: {ticket.email or 'N/A'}
+ เบอร์โทร: {ticket.phone or 'N/A'}
+ แผนก: {ticket.department or 'N/A'}
+ ประเภท: {ticket.type or 'N/A'}
+ วันนัดหมาย: {ticket.appointment or 'N/A'}
+ กลุ่ม: {ticket.report or 'N/A'}
+ กลุ่มย่อย: {getattr(ticket, 'subgroup', None) or 'N/A'}
+ รายงาน: {ticket.report or 'N/A'}
+ ความต้องการ: {ticket.requested or 'N/A'}
+ วันที่สร้าง: {ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'}
+ สถานะปัจจุบัน: {ticket.status}
+ ค้างมาแล้ว: {days_overdue} วัน
+ ความถี่การแจ้งเตือน: {frequency_desc}
 
 กรุณาดำเนินการตรวจสอบและอัปเดตสถานะ
 
@@ -801,11 +802,11 @@ Ticket ต่อไปนี้ค้างเป็นเวลา {days_overdu
 def send_new_ticket_alerts(ticket):
     """Send email alerts for new tickets"""
     try:
-        print(f"📧 DEBUG: Starting email alert for ticket {ticket.ticket_id}")
+        print(f"[EMAIL] DEBUG: Starting email alert for ticket {ticket.ticket_id}")
         
         # Skip email alerts for information type tickets
         if ticket.type and ticket.type.lower() == 'information':
-            print(f"ℹ️ DEBUG: Skipping email alert for information type ticket {ticket.ticket_id}")
+            print(f"[INFO] DEBUG: Skipping email alert for information type ticket {ticket.ticket_id}")
             return
         
         # Create email content directly
@@ -815,25 +816,25 @@ def send_new_ticket_alerts(ticket):
 
 มีทิกเก็ตใหม่เข้ามาในระบบ:
 
-📋 รหัสทิกเก็ต: {ticket.ticket_id}
-👤 ชื่อลูกค้า: {ticket.name or 'N/A'}
-📧 อีเมล: {ticket.email or 'N/A'}
-📞 เบอร์โทร: {ticket.phone or 'N/A'}
-🏢 แผนก: {ticket.department or 'N/A'}
-📝 ประเภท: {ticket.type or 'N/A'}
-📅 วันนัดหมาย: {ticket.appointment or 'N/A'}
-🔖 กลุ่ม: {ticket.report or 'N/A'}
-🏷️ กลุ่มย่อย: {getattr(ticket, 'subgroup', None) or 'N/A'}
-📄 รายงาน: {ticket.report or 'N/A'}
-🎯 ความต้องการ: {ticket.requested or 'N/A'}
-📅 วันที่สร้าง: {ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'}
+ รหัสทิกเก็ต: {ticket.ticket_id}
+ ชื่อลูกค้า: {ticket.name or 'N/A'}
+ อีเมล: {ticket.email or 'N/A'}
+ เบอร์โทร: {ticket.phone or 'N/A'}
+ แผนก: {ticket.department or 'N/A'}
+ ประเภท: {ticket.type or 'N/A'}
+ วันนัดหมาย: {ticket.appointment or 'N/A'}
+ กลุ่ม: {ticket.report or 'N/A'}
+ กลุ่มย่อย: {getattr(ticket, 'subgroup', None) or 'N/A'}
+ รายงาน: {ticket.report or 'N/A'}
+ ความต้องการ: {ticket.requested or 'N/A'}
+ วันที่สร้าง: {ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else 'N/A'}
 
 กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อไป
 
 ขอบคุณครับ'''
         
         # Send email directly to it@gi.or.th
-        print(f"📨 DEBUG: Sending email to {ALERT_RECIPIENT_EMAIL} ({ALERT_RECIPIENT_NAME})")
+        print(f"[EMAIL] DEBUG: Sending email to {ALERT_RECIPIENT_EMAIL} ({ALERT_RECIPIENT_NAME})")
         try:
             result = send_email_alert(
                 recipient_email=ALERT_RECIPIENT_EMAIL,
@@ -843,16 +844,14 @@ def send_new_ticket_alerts(ticket):
                 alert_type='new_ticket',
                 ticket_id=ticket.ticket_id
             )
-            print(f"✅ DEBUG: New ticket email sent successfully to {ALERT_RECIPIENT_EMAIL}")
+            print(f"[SUCCESS] DEBUG: New ticket email sent successfully to {ALERT_RECIPIENT_EMAIL}")
         except Exception as send_error:
-            print(f"❌ DEBUG: Failed to send new ticket email: {str(send_error)}")
+            print(f"[ERROR] DEBUG: Failed to send new ticket email: {str(send_error)}")
         
-        print(f"🎉 DEBUG: New ticket alerts process completed for ticket {ticket.ticket_id}")
+        print(f"[COMPLETE] DEBUG: New ticket alerts process completed for ticket {ticket.ticket_id}")
         
     except Exception as e:
         logger.error(f"Error sending new ticket alerts: {str(e)}")
-
-        logger.error(f"Error checking and sending overdue alerts: {str(e)}")
 def check_and_alert_new_tickets(tickets):
     """Check for new tickets and send email alerts"""
     try:
@@ -873,25 +872,21 @@ def check_and_alert_new_tickets(tickets):
         
        
         if new_tickets_found:
-            print(f"🔔 Found {len(new_tickets_found)} new tickets, sending email alerts...")
+            print(f"Found {len(new_tickets_found)} new tickets, sending email alerts...")
             
             for ticket in new_tickets_found:
                 try:
-                    print(f"📧 Sending alert for new ticket: {ticket.ticket_id}")
+                    print(f"Sending alert for new ticket: {ticket.ticket_id}")
                     send_new_ticket_alerts(ticket)
-                    print(f"✅ Alert sent for ticket: {ticket.ticket_id}")
+                    print(f"Alert sent for ticket: {ticket.ticket_id}")
                 except Exception as email_error:
-                    print(f"❌ Failed to send alert for ticket {ticket.ticket_id}: {str(email_error)}")
+                    print(f"Failed to send alert for ticket {ticket.ticket_id}: {str(email_error)}")
         else:
-            print("ℹ️ No new tickets found")
+            print("No new tickets found")
             
     except Exception as e:
-        print(f"❌ Error in check_and_alert_new_tickets: {str(e)}")
+        print(f"Error in check_and_alert_new_tickets: {str(e)}")
         logger.error(f"Error checking new tickets: {str(e)}")
-
-@app.route('/api/clear-alert-cache', methods=['POST'])
-@jwt_required()
-def clear_alert_cache():
     """Clear the alerted tickets cache (for testing)"""
     try:
         current_user_data = get_jwt_identity()
@@ -967,14 +962,14 @@ def send_textbox_message(user_id, message_text):
     """Send message to LINE user with error handling"""
     try:
         if not LINE_ACCESS_TOKEN:
-            print("❌ LINE_ACCESS_TOKEN not configured")
+            print("[ERROR] LINE_ACCESS_TOKEN not configured")
             return False
             
         if not user_id:
-            print("❌ user_id is empty")
+            print("[ERROR] user_id is empty")
             return False
             
-        print(f"📤 Attempting to send LINE message to user_id: {user_id}")
+        print(f"[INFO] Attempting to send LINE message to user_id: {user_id}")
         
         url = "https://api.line.me/v2/bot/message/push"
         headers = {
@@ -997,7 +992,7 @@ def send_textbox_message(user_id, message_text):
                             "contents": [
                                 {
                                     "type": "text",
-                                    "text": "💼 ตอบกลับจากเจ้าหน้าที่",
+                                    "text": " ตอบกลับจากเจ้าหน้าที่",
                                     "weight": "bold",
                                     "size": "lg",
                                     "color": "#005BBB"
@@ -1023,23 +1018,23 @@ def send_textbox_message(user_id, message_text):
         }
 
         response = requests.post(url, headers=headers, json=payload, timeout=10)
-        print(f"📱 LINE API response: {response.status_code} - {response.text[:200]}")
+        print(f"[INFO] LINE API response: {response.status_code} - {response.text[:200]}")
         
         if response.status_code == 200:
-            print(f"✅ LINE message sent successfully to {user_id}")
+            print(f"[SUCCESS] LINE message sent successfully to {user_id}")
             return True
         else:
-            print(f"❌ LINE API error {response.status_code}: {response.text}")
+            print(f"[ERROR] LINE API error {response.status_code}: {response.text}")
             return False
             
     except requests.exceptions.Timeout:
-        print(f"⏰ LINE API timeout for user_id: {user_id}")
+        print(f"[TIMEOUT] LINE API timeout for user_id: {user_id}")
         return False
     except requests.exceptions.RequestException as e:
-        print(f"❌ LINE API request error for {user_id}: {str(e)}")
+        print(f"[ERROR] LINE API request error for {user_id}: {str(e)}")
         return False
     except Exception as e:
-        print(f"⚠️ Unexpected error in send_textbox_message: {str(e)}")
+        print(f"[WARNING] Unexpected error in send_textbox_message: {str(e)}")
         return False
 
 def notify_user(payload):
@@ -1195,7 +1190,7 @@ def create_flex_message(payload):
                 "contents": [
                     {
                         "type": "text",
-                        "text": "📢 อัปเดตสถานะ Ticket",
+                        "text": " อัปเดตสถานะ Ticket",
                         "weight": "bold",
                         "size": "lg",
                         "color": "#FFFFFF",
@@ -1261,7 +1256,7 @@ def mark_notification_read():
         return jsonify({"error": str(e)}), 500
 
 # Add a route to mark all notifications as read
-@app.route('/mark-all-notifications-read', methods=['POST'])
+@app.route('/api/mark-all-notifications-read', methods=['POST'])
 def mark_all_notifications_read():
     try:
         # Update all unread notifications
@@ -1874,7 +1869,6 @@ def auth_status():
         
     except Exception as e:
         print(f"Auth status error: {str(e)}")
-        return jsonify({"authenticated": False, "message": "Server error"}), 500
 
 @app.route('/api/data')
 @cache.cached(timeout=60, query_string=True) 
@@ -1883,12 +1877,11 @@ def get_data():
        
         tickets = Ticket.query.order_by(Ticket.created_at.desc()).limit(1000).all()
         
-        
-        check_and_alert_new_tickets(tickets)
+        # NOTE: Removed check_and_alert_new_tickets from here - it was causing continuous email alerts
+        # Email alerts should only be triggered when new tickets are created, not on every data fetch
         
     
-        check_and_send_overdue_alerts()
-        
+       
         result = [
             {
                 "Ticket ID": ticket.ticket_id,
@@ -2106,12 +2099,12 @@ def create_ticket():
         )
         
         
-        print(f"🔔 DEBUG: Attempting to send email alerts for ticket {ticket_id}")
+        print(f"[DEBUG] DEBUG: Attempting to send email alerts for ticket {ticket_id}")
         try:
             send_new_ticket_alerts(new_ticket)
-            print(f"✅ DEBUG: Email alert function completed for ticket {ticket_id}")
+            print(f"[SUCCESS] DEBUG: Email alert function completed for ticket {ticket_id}")
         except Exception as email_error:
-            print(f"❌ DEBUG: Email alert failed: {str(email_error)}")
+            print(f"[ERROR] DEBUG: Email alert failed: {str(email_error)}")
         
         return jsonify({"success": True, "ticket_id": ticket_id}), 201
         
@@ -2339,22 +2332,22 @@ def delete_ticket():
     try:
         # 1) ลบ TicketStatusLog และ Message ที่อ้างถึง ticket_id นี้ก่อน แล้ว commit แยก
         try:
-            print(f"🗑️ DEBUG: Deleting data for ticket_id: {ticket_id}")
+            print(f"[DELETE] DEBUG: Deleting data for ticket_id: {ticket_id}")
             
             # Delete status logs
             logs_deleted = TicketStatusLog.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
-            print(f"📄 DEBUG: Deleted {logs_deleted} status logs")
+            print(f"[DELETE] DEBUG: Deleted {logs_deleted} status logs")
             
             # Delete messages using ticket_id field
             messages_deleted = Message.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
-            print(f"💬 DEBUG: Deleted {messages_deleted} messages")
+            print(f"[DELETE] DEBUG: Deleted {messages_deleted} messages")
             
             # Delete email alerts related to this ticket
             try:
                 alerts_deleted = EmailAlert.query.filter_by(ticket_id=ticket_id).delete(synchronize_session=False)
-                print(f"📧 DEBUG: Deleted {alerts_deleted} email alerts")
+                print(f"[INFO] DEBUG: Deleted {alerts_deleted} email alerts")
             except Exception as alert_err:
-                print(f"⚠️ WARNING: Could not delete email alerts: {alert_err}")
+                print(f"[WARNING] WARNING: Could not delete email alerts: {alert_err}")
             
             db.session.commit()  # commit ทันทีเพื่อให้ DB ลบ record เหล่านั้นจริง ๆ
         except Exception as msg_err:
@@ -2574,49 +2567,7 @@ def get_email_rankings():
         if 'conn' in locals():
             conn.close()
 
-@app.route('/send-announcement', methods=['POST'])
-def send_announcement():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-    
-    message = data.get('message')
-    if not message:
-        return jsonify({"error": "Message is required"}), 400
-
-    try:
-        # ดึง user_id ที่ type == 'Information' จาก tickets
-        users = (
-            db.session.query(Ticket.user_id, Ticket.name)
-            .filter(Ticket.type == 'Information')
-            .distinct()
-            .all()
-        )
-        recipient_count = 0
-
-        for user in users:
-            user_id = user.user_id
-            if user_id:
-                if send_announcement_message(user_id, message, user.name):
-                    recipient_count += 1
-
-        # Create notification
-        add_notification_to_db(
-            message=f"New announcement: {message}",
-            sender_name="system",
-            user_id=None,
-            meta_data={"type": "announcement"}
-        )
-
-        return jsonify({
-            "success": True,
-            "recipient_count": recipient_count,
-            "message": "Announcement sent successfully"
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+# Removed duplicate send_announcement function - using the JWT-protected version at line 4050 instead
 
 def send_announcement_message(user_id, message, recipient_name=None):
     url = "https://api.line.me/v2/bot/message/push"
@@ -2704,7 +2655,7 @@ def send_announcement_message(user_id, message, recipient_name=None):
         print(f"Error sending LINE announcement: {str(e)}")
         return False
 
-@app.route('/delete-notification', methods=['POST'])
+@app.route('/api/delete-notification', methods=['POST'])
 def delete_notification():
     data = request.get_json()
     if not data:
@@ -3133,7 +3084,7 @@ def process_textbox_messages():
         if not ticket_id:
             return jsonify({"error": "ticket_id is required"}), 400
         
-        print(f"📦 ย้าย textbox ไป messages สำหรับ ticket: {ticket_id}")
+        print(f"[INFO] Moving textbox to messages for ticket: {ticket_id}")
         
         # หา ticket ที่มี textbox และ type = "information"
         ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
@@ -3164,7 +3115,7 @@ def process_textbox_messages():
             timestamp=datetime.utcnow()
         )
         db.session.add(new_message)
-        print(f"✅ สร้าง message ใหม่แล้ว")
+        print(f"[SUCCESS] สร้าง message ใหม่แล้ว")
         
         # สร้าง notification
         user_name = ticket.name if ticket.name else f"User {ticket_id[:8]}..."
@@ -3183,15 +3134,15 @@ def process_textbox_messages():
             })
         )
         db.session.add(notification)
-        print(f"✅ สร้าง notification แล้ว")
+        print(f"[SUCCESS] สร้าง notification แล้ว")
         
         # ลบ textbox หลังจากย้ายแล้ว
         ticket.textbox = None
-        print(f"🗑️ ลบ textbox ออกจาก ticket แล้ว")
+        print(f"[DELETE] ลบ textbox ออกจาก ticket แล้ว")
         
         db.session.commit()
         
-        print(f"✅ ย้าย textbox ไป messages สำเร็จ สำหรับ ticket {ticket_id}")
+        print(f"[SUCCESS] ย้าย textbox ไป messages สำเร็จ สำหรับ ticket {ticket_id}")
         return jsonify({
             "success": True,
             "message": "ย้าย textbox ไป messages สำเร็จแล้ว",
@@ -3202,7 +3153,7 @@ def process_textbox_messages():
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ ข้อผิดพลาดในการย้าย textbox: {str(e)}")
+        print(f" ข้อผิดพลาดในการย้าย textbox: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
@@ -3214,7 +3165,7 @@ def process_all_textbox_messages():
         return '', 200
     
     try:
-        print(f"📦 เริ่มย้าย textbox ทั้งหมดไป messages...")
+        # print(f"[INFO] เริ่มย้าย textbox ทั้งหมดไป messages...")
         
         # หา tickets ทั้งหมดที่มี textbox ไม่ว่าง และ type = "information"
         tickets_with_textbox = Ticket.query.filter(
@@ -3224,7 +3175,7 @@ def process_all_textbox_messages():
         ).all()
         
         if not tickets_with_textbox:
-            print(f"ℹ️ ไม่พบ tickets ที่มี textbox")
+            # print(f"[INFO] ไม่พบ tickets ที่มี textbox")
             return jsonify({
                 "success": True,
                 "message": "ไม่พบ tickets ที่มี textbox ที่จะย้าย",
@@ -3232,7 +3183,7 @@ def process_all_textbox_messages():
                 "ticket_ids": []
             })
         
-        print(f"🔍 พบ {len(tickets_with_textbox)} tickets ที่มี textbox")
+        print(f"[FOUND] พบ {len(tickets_with_textbox)} tickets ที่มี textbox")
         
         processed_count = 0
         processed_tickets = []
@@ -3279,9 +3230,9 @@ def process_all_textbox_messages():
                     processed_count += 1
                     processed_tickets.append(ticket.ticket_id)
                     
-                    print(f"✅ ย้าย textbox สำเร็จสำหรับ ticket {ticket.ticket_id}")
+                    print(f"[SUCCESS] ย้าย textbox สำเร็จสำหรับ ticket {ticket.ticket_id}")
             except Exception as ticket_error:
-                print(f"❌ ข้อผิดพลาดในการย้าย ticket {ticket.ticket_id}: {str(ticket_error)}")
+                print(f"[ERROR] ข้อผิดพลาดในการย้าย ticket {ticket.ticket_id}: {str(ticket_error)}")
                 failed_tickets.append(ticket.ticket_id)
                 continue
         
@@ -3291,7 +3242,7 @@ def process_all_textbox_messages():
         if failed_tickets:
             result_message += f", ล้มเหลว {len(failed_tickets)} tickets"
         
-        print(f"✅ {result_message}")
+        print(f"[SUCCESS] {result_message}")
         return jsonify({
             "success": True,
             "message": result_message,
@@ -3303,7 +3254,7 @@ def process_all_textbox_messages():
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ CRITICAL ERROR in process_all_textbox_messages: {str(e)}")
+        logger.error(f"[ERROR] CRITICAL ERROR in process_all_textbox_messages: {str(e)}")
         logger.error(f"Full traceback: {traceback.format_exc()}")
         
         # Log additional context
@@ -3319,10 +3270,10 @@ def process_all_textbox_messages():
 # Test endpoint to verify server is working
 @app.route('/api/test-messages', methods=['GET', 'POST'])
 def test_messages():
-    print(f"🧪 DEBUG: /api/test-messages called with method {request.method}")
+    print(f"[DEBUG] /api/test-messages called with method {request.method}")
     if request.method == 'POST':
         data = request.get_json()
-        print(f"📝 DEBUG: POST data received: {data}")
+        print(f"[DEBUG] POST data received: {data}")
         return jsonify({"success": True, "message": "Test endpoint working", "received_data": data})
     else:
         return jsonify({"success": True, "message": "Test endpoint working - GET"})
@@ -3333,13 +3284,13 @@ def get_messages():
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
     
-    print(f"📨 Getting messages for user_id: {user_id}")
+    print(f"[INFO] Getting messages for user_id: {user_id}")
     
     # Auto-process textbox messages for this user_id before returning messages
     try:
         ticket = Ticket.query.filter_by(ticket_id=user_id).first()
         if ticket and ticket.textbox and ticket.textbox.strip():
-            print(f"📦 Auto-processing textbox for ticket {user_id}: {ticket.textbox[:50]}...")
+            # print(f"[INFO] Auto-processing textbox for ticket {user_id}: {ticket.textbox[:50]}...")
             
             # Create message from textbox content
             new_message = Message(
@@ -3359,9 +3310,11 @@ def get_messages():
                 sender_name=user_name,
                 user_id=user_id,
                 meta_data=json.dumps({
-                    "type": "textbox_message",
+                    "type": "new_message",
+                    "sender_type": "user",
                     "ticket_id": user_id,
-                    "user_name": user_name
+                    "user_id": user_id,
+                    "sender_name": user_name
                 })
             )
             db.session.add(notification)
@@ -3370,9 +3323,9 @@ def get_messages():
             ticket.textbox = None
             db.session.commit()
             
-            print(f"✅ Auto-processed textbox message for ticket {user_id}")
+            # print(f"[SUCCESS] Auto-processed textbox message for ticket {user_id}")
     except Exception as e:
-        print(f"⚠️ Error auto-processing textbox: {str(e)}")
+        print(f"[WARNING] Error auto-processing textbox: {str(e)}")
         db.session.rollback()
     
     # Get all messages for this user
@@ -3389,25 +3342,25 @@ def get_messages():
         for m in messages
     ]
     
-    print(f"📋 Returning {len(result)} messages for user {user_id}")
+    print(f"[INFO] Returning {len(result)} messages for user {user_id}")
     return jsonify(result)
 
 @app.route('/api/messages', methods=['POST'])
 def send_message():
-    print(f"📨 DEBUG: /api/messages POST request received from {request.remote_addr}")
+    print(f"[DEBUG] /api/messages POST request received from {request.remote_addr}")
     try:
         data = request.get_json()
         if not data:
             return jsonify({"error": "No JSON data provided"}), 400
         
-        print(f"💬 DEBUG: Received message data: {data}")
+        print(f"[DEBUG] Received message data: {data}")
         
         user_id = data.get('user_id')
         admin_id = data.get('admin_id')
         sender_type = data.get('sender_type')
         message = data.get('message')
         
-        print(f"🔍 DEBUG: user_id={user_id}, sender_type={sender_type}, message_length={len(message) if message else 0}")
+        print(f"[DEBUG] DEBUG: user_id={user_id}, sender_type={sender_type}, message_length={len(message) if message else 0}")
         
         if not user_id or not message:
             return jsonify({"error": "user_id and message are required"}), 400
@@ -3420,15 +3373,15 @@ def send_message():
         if sender_type not in ['user', 'admin']:
             sender_type = 'user'  # Default fallback
         
-        print(f"💬 DEBUG: Final sender_type={sender_type}")
+        print(f" DEBUG: Final sender_type={sender_type}")
         
         # Check if ticket exists BEFORE creating message
         ticket = Ticket.query.filter_by(user_id=user_id).first()
-        print(f"🎫 DEBUG: Ticket found: {ticket is not None}")
+        print(f"[INFO] DEBUG: Ticket found: {ticket is not None}")
         
         # Set user_name for display purposes
         if not ticket:
-            print(f"⚠️ ไม่พบ ticket {user_id} - อนุญาตให้ส่งข้อความได้แต่ไม่สร้าง dummy ticket")
+            print(f"[WARNING] ไม่พบ ticket {user_id} - อนุญาตให้ส่งข้อความได้แต่ไม่สร้าง dummy ticket")
             user_name = f"User {user_id[:8]}..."
         else:
             user_name = ticket.name if ticket.name else "Unknown User"
@@ -3473,11 +3426,11 @@ def send_message():
             try:
                 line_success = send_textbox_message(user_id, message)
                 if line_success:
-                    print(f"✅ LINE message sent successfully to {user_id}")
+                    print(f" LINE message sent successfully to {user_id}")
                 else:
-                    print(f"❌ Failed to send LINE message to {user_id}")
+                    print(f" Failed to send LINE message to {user_id}")
             except Exception as line_error:
-                print(f"⚠️ LINE message error for {user_id}: {str(line_error)}")
+                print(f" LINE message error for {user_id}: {str(line_error)}")
         
         return jsonify({
             "id": msg.id,
@@ -3493,8 +3446,8 @@ def send_message():
         db.session.rollback()
         import traceback
         error_details = traceback.format_exc()
-        print(f"❌ ERROR in send_message: {str(e)}")
-        print(f"🔍 Full traceback: {error_details}")
+        print(f" ERROR in send_message: {str(e)}")
+        print(f" Full traceback: {error_details}")
         return jsonify({"error": str(e), "details": error_details}), 500
 
 @app.route('/api/status')
@@ -3807,10 +3760,11 @@ def sync_simple():
 
 @app.route('/api/chat-users', methods=['GET'])
 def get_chat_users():
-    # ดึงผู้ใช้ที่มี type == 'Information' จากตาราง tickets
+    # ดึงผู้ใช้ทั้งหมดที่มี user_id จากตาราง tickets (ไม่จำกัดแค่ type == 'Information')
+    # เพื่อให้แสดงทุกคนที่เคยส่งข้อความ
     users = (
         db.session.query(Ticket.user_id, Ticket.name)
-        .filter(Ticket.type == 'Information')
+        .filter(Ticket.user_id.isnot(None))
         .distinct()
         .all()
     )
@@ -4053,6 +4007,192 @@ def fix_null_sender_type():
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
+# Announcement/Broadcast endpoint for sending messages to all users
+@app.route('/api/send-announcement', methods=['POST'])
+@jwt_required()
+def send_announcement():
+    try:
+        data = request.get_json()
+        if not data or not data.get('message'):
+            return jsonify({"error": "Message is required"}), 400
+        
+        message_text = data.get('message')
+        
+        # Get only active LINE users (those with user_id that starts with 'U')
+        # Filter for tickets that have valid LINE user IDs
+        all_tickets = Ticket.query.filter(
+            Ticket.user_id.isnot(None),
+            Ticket.user_id != '',
+            Ticket.user_id.like('U%')  # LINE user IDs start with 'U'
+        ).all()
+        
+        if not all_tickets:
+            return jsonify({"error": "No active LINE users found"}), 404
+        
+        # Deduplicate users - each user should receive only one announcement
+        unique_users = {}
+        for ticket in all_tickets:
+            if ticket.user_id not in unique_users:
+                unique_users[ticket.user_id] = ticket
+        
+        print(f"[INFO] Found {len(all_tickets)} tickets with {len(unique_users)} unique users")
+        
+        # Send announcement to each unique user
+        notifications_created = 0
+        line_messages_sent = 0
+        
+        for user_id, ticket in unique_users.items():
+            try:
+                # Send message to LINE user
+                if send_announcement_to_line(user_id, message_text):
+                    line_messages_sent += 1
+                    print(f"[INFO] Announcement sent to LINE user: {user_id}")
+                else:
+                    print(f"[WARNING] Failed to send announcement to LINE user: {user_id}")
+                
+                # Create notification in database
+                notification = Notification(
+                    message=f"ประกาศ: {message_text}",
+                    sender_name="ระบบ",
+                    user_id=user_id,
+                    timestamp=datetime.utcnow(),
+                    read=False,
+                    meta_data=json.dumps({
+                        "type": "announcement",
+                        "sender_type": "admin"
+                    })
+                )
+                db.session.add(notification)
+                
+                # Also create a message record
+                message = Message(
+                    user_id=user_id,
+                    sender_type="admin",
+                    message=f"[ANNOUNCEMENT] ประกาศ: {message_text}",
+                    timestamp=datetime.utcnow()
+                )
+                db.session.add(message)
+                notifications_created += 1
+                
+            except Exception as e:
+                logger.error(f"Failed to process announcement for {user_id}: {str(e)}")
+                continue
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Announcement sent to {len(unique_users)} unique LINE users",
+            "recipients": line_messages_sent,
+            "notifications_created": notifications_created,
+            "unique_users": len(unique_users),
+            "total_tickets": len(all_tickets)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error sending announcement: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def send_announcement_to_line(user_id, message_text):
+    """Send announcement message to LINE user"""
+    try:
+        if not LINE_ACCESS_TOKEN:
+            print("[ERROR] LINE_ACCESS_TOKEN not configured")
+            return False
+            
+        if not user_id:
+            print("[ERROR] user_id is empty")
+            return False
+            
+        print(f"[INFO] Sending announcement to LINE user: {user_id}")
+        
+        url = "https://api.line.me/v2/bot/message/push"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {LINE_ACCESS_TOKEN}"
+        }
+
+        # Create Flex Message for announcement
+        payload = {
+            "to": user_id,
+            "messages": [
+                {
+                    "type": "flex",
+                    "altText": "📢 ประกาศจากระบบ",
+                    "contents": {
+                        "type": "bubble",
+                        "header": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "📢 ประกาศจากระบบ",
+                                    "weight": "bold",
+                                    "size": "xl",
+                                    "color": "#FFFFFF"
+                                }
+                            ],
+                            "backgroundColor": "#FF6B6B",
+                            "paddingAll": "15px"
+                        },
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": message_text,
+                                    "wrap": True,
+                                    "size": "md",
+                                    "margin": "md"
+                                },
+                                {
+                                    "type": "separator",
+                                    "margin": "xl"
+                                },
+                                {
+                                    "type": "text",
+                                    "text": f"วันที่: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                                    "size": "xs",
+                                    "color": "#AAAAAA",
+                                    "margin": "md"
+                                }
+                            ]
+                        },
+                        "footer": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "หากมีข้อสงสัย กรุณาติดต่อเจ้าหน้าที่",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "align": "center"
+                                }
+                            ],
+                            "backgroundColor": "#F5F5F5",
+                            "paddingAll": "10px"
+                        }
+                    }
+                }
+            ]
+        }
+
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            print(f"[SUCCESS] Announcement sent to LINE user: {user_id}")
+            return True
+        else:
+            print(f"[ERROR] Failed to send announcement. Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"[ERROR] Exception sending announcement to LINE: {str(e)}")
+        return False
 
 # เพิ่ม endpoint สำหรับเพิ่ม notification โดยตรง (optional)
 @app.route('/api/add-notification', methods=['POST'])
@@ -4690,15 +4830,15 @@ def init_default_email_templates():
 
 มีทิกเก็ตใหม่เข้ามาในระบบ:
 
-📋 รหัสทิกเก็ต: {ticket_id}
-👤 ชื่อลูกค้า: {name}
-📧 อีเมล: {email}
-📞 เบอร์โทร: {phone}
-🏢 แผนก: {department}
-📝 ประเภท: {type}
-📄 รายงาน: {report}
-🎯 ความต้องการ: {requested}
-📅 วันที่สร้าง: {created_at}
+ รหัสทิกเก็ต: {ticket_id}
+ ชื่อลูกค้า: {name}
+ อีเมล: {email}
+ เบอร์โทร: {phone}
+ แผนก: {department}
+ ประเภท: {type}
+ รายงาน: {report}
+ ความต้องการ: {requested}
+ วันที่สร้าง: {created_at}
 
 กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อไป
 
@@ -4706,7 +4846,7 @@ def init_default_email_templates():
             },
             {
                 'template_type': 'overdue_ticket',
-                'subject_template': '⚠️ แจ้งเตือน: มีทิกเก็ตค้างคา {count} รายการ (เกิน {days} วัน)',
+                'subject_template': ' แจ้งเตือน: มีทิกเก็ตค้างคา {count} รายการ (เกิน {days} วัน)',
                 'body_template': '''เรียน ผู้ใช้ระบบ,
 
 มีทิกเก็ตที่ค้างคามานานเกิน {days} วัน จำนวน {count} รายการ:
@@ -4879,10 +5019,10 @@ def test_email():
 
 นี่คือการทดสอบระบบอีเมลแจ้งเตือนของระบบ Ticket Management
 
-✅ ระบบอีเมลทำงานปกติ
-📧 อีเมลผู้ส่ง: {app.config['MAIL_USERNAME']}
-📧 อีเมลผู้รับ: {recipient_email}
-🕐 เวลาที่ส่ง: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+ ระบบอีเมลทำงานปกติ
+ อีเมลผู้ส่ง: {app.config['MAIL_USERNAME']}
+ อีเมลผู้รับ: {recipient_email}
+ เวลาที่ส่ง: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
 
 ขอบคุณครับ
 ระบบ Ticket Management'''
@@ -4920,15 +5060,15 @@ def delete_ticket_endpoint():
         
         # Delete related data and ticket
         try:
-            print(f"🗑️ DEBUG: Deleting data for ticket_id: {ticket_id}")
+            print(f" DEBUG: Deleting data for ticket_id: {ticket_id}")
             
             # Delete messages related to this ticket using ticket_id field
             messages_deleted = db.session.query(Message).filter(Message.ticket_id == ticket_id).delete()
-            print(f"💬 DEBUG: Deleted {messages_deleted} messages")
+            print(f" DEBUG: Deleted {messages_deleted} messages")
             
             # Delete status logs related to this ticket
             logs_deleted = db.session.query(TicketStatusLog).filter(TicketStatusLog.ticket_id == ticket_id).delete()
-            print(f"📄 DEBUG: Deleted {logs_deleted} status logs")
+            print(f" DEBUG: Deleted {logs_deleted} status logs")
             
             # Delete the ticket itself
             ticket = Ticket.query.get(ticket_id)
@@ -4960,16 +5100,16 @@ def delete_ticket_endpoint():
             db.session.rollback()
             import traceback
             error_details = traceback.format_exc()
-            print(f"❌ ERROR deleting ticket data: {str(delete_error)}")
-            print(f"🔍 Delete traceback: {error_details}")
+            print(f"[ERROR] ERROR deleting ticket data: {str(delete_error)}")
+            print(f"[DEBUG] Delete traceback: {error_details}")
             return jsonify({"error": f"Failed to delete ticket: {str(delete_error)}", "details": error_details}), 500
         
     except Exception as e:
         db.session.rollback()
         import traceback
         error_details = traceback.format_exc()
-        print(f"❌ ERROR in delete_ticket_endpoint: {str(e)}")
-        print(f"🔍 Full delete traceback: {error_details}")
+        print(f" ERROR in delete_ticket_endpoint: {str(e)}")
+        print(f" Full delete traceback: {error_details}")
         return jsonify({"error": str(e), "details": error_details}), 500
 
 def setup_scheduler():
@@ -4986,41 +5126,54 @@ def setup_scheduler():
             id='overdue_alerts_job'
         )
         
-        # Add job to process textbox messages every 30 seconds
+        # Add job to process textbox messages every 30 seconds for near real-time notifications
         scheduler.add_job(
             func=auto_process_textbox_notifications,
-            trigger=IntervalTrigger(seconds=30),
+            trigger=IntervalTrigger(seconds=30),  # Changed to 30 seconds for faster response
             id='textbox_processor',
             name='Auto-process textbox messages to notifications',
             replace_existing=True
         )
         
         scheduler.start()
-        print("📅 Background scheduler started:")
-        print("  - Overdue alerts: daily at 9:00 AM")
-        print("  - Textbox processing: every 30 seconds")
+        logger.info("Background scheduler started:")
+        logger.info("  - Overdue alerts: daily at 9:00 AM")
+        logger.info("  - Textbox processing: every 30 minutes")
         
         # Ensure scheduler shuts down when app exits
         import atexit
-        atexit.register(lambda: scheduler.shutdown())
-        
     except Exception as e:
-        print(f"❌ Error setting up scheduler: {str(e)}")
+        print(f"Error setting up scheduler: {str(e)}")
 
 def auto_process_textbox_notifications():
     """Background job function to process textbox messages into notifications"""
     try:
         with app.app_context():
-            print("🔄 Auto-processing textbox messages...")
+            logger.info("Auto-processing textbox messages...")
+            
+            # Test database connection first
+            try:
+                db.session.execute(text('SELECT 1'))
+                logger.info("Database connection successful")
+            except Exception as db_error:
+                logger.error(f"Database connection failed: {str(db_error)}")
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                return
             
             # Find all tickets with non-empty textbox content
-            tickets_with_textbox = Ticket.query.filter(
-                and_(
-                    Ticket.textbox.isnot(None),
-                    Ticket.textbox != '',
-                    Ticket.textbox != 'null'
-                )
-            ).all()
+            try:
+                tickets_with_textbox = Ticket.query.filter(
+                    and_(
+                        Ticket.textbox.isnot(None),
+                        Ticket.textbox != '',
+                        Ticket.textbox != 'null'
+                    )
+                ).all()
+                logger.info(f"Found {len(tickets_with_textbox)} tickets with textbox messages to process")
+            except Exception as query_error:
+                logger.error(f"Query failed: {str(query_error)}")
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                return
             
             processed_count = 0
             
@@ -5031,6 +5184,7 @@ def auto_process_textbox_notifications():
                         continue
                     
                     user_name = ticket.name or ticket.ticket_id or "Unknown User"
+                    logger.info(f"Processing ticket {ticket.ticket_id}: {textbox_content[:30]}...")
                     
                     # Create notification
                     notification = Notification(
@@ -5063,20 +5217,20 @@ def auto_process_textbox_notifications():
                     ticket.textbox = None
                     
                     processed_count += 1
-                    print(f"✅ Processed textbox for ticket {ticket.ticket_id}: {textbox_content[:30]}...")
+                    print(f"Processed textbox for ticket {ticket.ticket_id}: {textbox_content[:30]}...")
                     
                 except Exception as ticket_error:
-                    print(f"❌ Error processing ticket {ticket.ticket_id}: {str(ticket_error)}")
+                    print(f"Error processing ticket {ticket.ticket_id}: {str(ticket_error)}")
                     continue
             
             if processed_count > 0:
                 db.session.commit()
-                print(f"🎉 Auto-processed {processed_count} textbox messages into notifications")
+                print(f"Auto-processed {processed_count} textbox messages into notifications")
             else:
-                print("📭 No textbox messages to process")
+                print("No textbox messages to process")
                 
     except Exception as e:
-        logger.error(f"Error in auto_process_textbox_notifications: {str(e)}")
+        print(f"Error in auto_process_textbox_notifications: {str(e)}")
         db.session.rollback()
 
 @app.route('/api/test-email', methods=['POST'])
@@ -5189,28 +5343,6 @@ def migrate_messages_table():
             conn.close()
 
 
-def setup_scheduler():
-    """Setup background scheduler to auto-process textbox messages into notifications"""
-    try:
-        scheduler = BackgroundScheduler()
-        
-        # Add job to process textbox messages every 30 seconds
-        scheduler.add_job(
-            func=auto_process_textbox_notifications,
-            trigger=IntervalTrigger(seconds=30),
-            id='textbox_processor',
-            name='Auto-process textbox messages to notifications',
-            replace_existing=True
-        )
-        
-        scheduler.start()
-        print("Background scheduler started - will auto-process textbox messages every 30 seconds")
-        
-    except Exception as e:
-        print(f"Error setting up scheduler: {str(e)}")
-
-def auto_process_textbox_notifications():
-    """Background job function to process textbox messages into notifications"""
     try:
         with app.app_context():
             logger.info("Auto-processing textbox messages...")
@@ -5371,32 +5503,9 @@ if __name__ == '__main__':
     
     setup_scheduler()
     
-    # HTTPS Configuration for Mixed Content Error Fix
-    import ssl
-    import os
-    
-    # Check if SSL certificate files exist
-    cert_file = 'cert.pem'  # SSL certificate file
-    key_file = 'key.pem'   # SSL private key file
-    
-    if os.path.exists(cert_file) and os.path.exists(key_file):
-        print("Starting HTTPS server on port 5004...")
-        print("SSL Certificate found - Running in HTTPS mode")
-        print("Backend URL: https://ticket-backoffice.git.or.th:5004")
-        print("Same domain as frontend - No CORS issues!")
-        
-        # Create SSL context
-        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-        context.load_cert_chain(cert_file, key_file)
-        
-        app.run(host='0.0.0.0', port=5004, debug=False, ssl_context=context)
-    else:
-        print("SSL Certificate not found - Running in HTTP mode")
-        print("Backend URL: http://10.10.1.53:5004")
-        print("Mixed Content Error will occur with HTTPS frontend!")
-        print("")
-        print("To fix Mixed Content Error:")
-        print("   1. Generate SSL certificate: cert.pem & key.pem")
-        print("   2. Or change frontend to HTTP: http://ticket-backoffice.git.or.th")
-        
-        app.run(host='0.0.0.0', port=5004, debug=False)
+# Only run server if this file is executed directly, not imported
+if __name__ == "__main__":
+    # Use Flask development server (more stable on Windows)
+    print("Backend-OA starting on http://0.0.0.0:5004")
+    print("Running Flask development server")
+    app.run(host='0.0.0.0', port=5004, debug=False, use_reloader=False, threaded=True)
